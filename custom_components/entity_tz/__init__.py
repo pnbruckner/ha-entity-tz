@@ -7,8 +7,15 @@ from timezonefinder import TimezoneFinder
 
 from homeassistant.components import zone
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID, Platform
-from homeassistant.core import Event, HomeAssistant, State, callback
+from homeassistant.const import (
+    ATTR_LATITUDE,
+    ATTR_LONGITUDE,
+    CONF_ENTITY_ID,
+    EVENT_CORE_CONFIG_UPDATE,
+    EVENT_STATE_CHANGED,
+    Platform,
+)
+from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
@@ -35,7 +42,7 @@ def get_tz_name(hass: HomeAssistant, state: State | None) -> str | None:
 
 
 async def init_hass_data(hass: HomeAssistant) -> None:
-    """Get list of zones to use."""
+    """Initialize integration's data."""
     if DOMAIN in hass.data:
         return
     hass.data[DOMAIN] = {}
@@ -50,11 +57,23 @@ async def init_hass_data(hass: HomeAssistant) -> None:
 
     await hass.async_add_executor_job(create_timefinder)
 
-    zones = []
-    for state in hass.states.async_all(zone.DOMAIN):
-        if get_tz_name(hass, state) != hass.config.time_zone:
-            zones.append(state.entity_id)
-    hass.data[DOMAIN]["zones"] = zones
+    @callback
+    def update_zones(_: Event | None = None) -> None:
+        """Update list of zones to use."""
+        zones = []
+        for state in hass.states.async_all(zone.DOMAIN):
+            if get_tz_name(hass, state) != hass.config.time_zone:
+                zones.append(state.entity_id)
+        hass.data[DOMAIN]["zones"] = zones
+
+    @callback
+    def zones_filter(event: Event) -> bool:
+        """Return if the state changed event is for a zone."""
+        return split_entity_id(event.data["entity_id"])[0] == zone.DOMAIN
+
+    update_zones()
+    hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update_zones)
+    hass.bus.async_listen(EVENT_STATE_CHANGED, update_zones, zones_filter)
 
 
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
