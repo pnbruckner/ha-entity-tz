@@ -1,6 +1,7 @@
 """Config flow for Illuminance integration."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import partial
 from typing import Any
 
@@ -34,20 +35,22 @@ def _wrapped_entity_config_entry_title(
     return object_id
 
 
-def _use_state(hass: HomeAssistant, state: State) -> bool:
-    """Determine if state represents and entity that should be listed as an option."""
+def _use_state(
+    hass: HomeAssistant, used_entity_ids: Iterable[str], state: State
+) -> bool:
+    """Determine if state represents an entity that should be listed as an option."""
     if not state:
         return False
-    if state.domain in (geo_location.DOMAIN,):
+    if (domain := state.domain) in (geo_location.DOMAIN,):
         return False
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
         return False
-    if state.domain == zone.DOMAIN:
-        use_zone = state.entity_id in hass.data[DOMAIN]["zones"]
-        return use_zone
-    return True
+    entity_id = state.entity_id
+    if domain == zone.DOMAIN and entity_id not in hass.data[DOMAIN]["zones"]:
+        return False
+    return entity_id not in used_entity_ids
 
 
 class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -66,10 +69,15 @@ class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=title, data=user_input)
 
         await init_hass_data(self.hass)
+        used_entity_ids = [
+            entry.data[CONF_ENTITY_ID]
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        ]
         entity_ids = [
             state.entity_id
             for state in filter(
-                partial(_use_state, self.hass), self.hass.states.async_all()
+                partial(_use_state, self.hass, used_entity_ids),
+                self.hass.states.async_all(),
             )
         ]
         data_schema = vol.Schema(
