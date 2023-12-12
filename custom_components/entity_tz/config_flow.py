@@ -1,19 +1,53 @@
 """Config flow for Illuminance integration."""
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components import geo_location, zone
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID
+from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.schema_config_entry_flow import (
-    wrapped_entity_config_entry_title,
-)
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
+from . import init_hass_data
 from .const import DOMAIN
+
+
+def _wrapped_entity_config_entry_title(
+    hass: HomeAssistant, entity_id_or_uuid: str
+) -> str:
+    """Generate title for a config entry wrapping a single entity."""
+    registry = er.async_get(hass)
+    entity_id = er.async_validate_entity_id(registry, entity_id_or_uuid)
+    entry = registry.async_get(entity_id)
+    if entry_name := (entry and (entry.name or entry.original_name)):
+        return entry_name
+    state = hass.states.get(entity_id)
+    if state_name := (state and state.name):
+        return state_name
+    object_id = split_entity_id(entity_id)[1]
+    return object_id
+
+
+def _use_state(hass: HomeAssistant, state: State) -> bool:
+    """Determine if state represents and entity that should be listed as an option."""
+    if not state:
+        return False
+    if state.domain in (geo_location.DOMAIN,):
+        return False
+    lat = state.attributes.get(ATTR_LATITUDE)
+    lng = state.attributes.get(ATTR_LONGITUDE)
+    if lat is None or lng is None:
+        return False
+    if state.domain == zone.DOMAIN:
+        use_zone = state.entity_id in hass.data[DOMAIN]["zones"]
+        return use_zone
+    return True
 
 
 class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -26,17 +60,16 @@ class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Start user config flow."""
         if user_input is not None:
-            title = wrapped_entity_config_entry_title(
+            title = _wrapped_entity_config_entry_title(
                 self.hass, user_input[CONF_ENTITY_ID]
             )
             return self.async_create_entry(title=title, data=user_input)
 
+        await init_hass_data(self.hass)
         entity_ids = [
             state.entity_id
-            for state in self.hass.states.async_all()
-            if state.domain != "zone"
-            and all(
-                attr in state.attributes for attr in (ATTR_LATITUDE, ATTR_LONGITUDE)
+            for state in filter(
+                partial(_use_state, self.hass), self.hass.states.async_all()
             )
         ]
         data_schema = vol.Schema(

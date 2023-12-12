@@ -1,8 +1,11 @@
 """Entity Time Zone Sensor."""
 from __future__ import annotations
 
+from typing import cast
+
 from timezonefinder import TimezoneFinder
 
+from homeassistant.components import zone
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID, Platform
 from homeassistant.core import Event, HomeAssistant, State, callback
@@ -15,8 +18,27 @@ from .const import DOMAIN, SIG_ENTITY_CHANGED
 PLATFORMS = [Platform.SENSOR]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up composite integration."""
+def signal(entry: ConfigEntry) -> str:
+    """Return signal name derived from config entry."""
+    return f"{SIG_ENTITY_CHANGED}-{entry.entry_id}"
+
+
+def get_tz_name(hass: HomeAssistant, state: State | None) -> str | None:
+    """Get time zone name from latitude & longitude from state."""
+    if not state:
+        return None
+    lat = state.attributes.get(ATTR_LATITUDE)
+    lng = state.attributes.get(ATTR_LONGITUDE)
+    if lat is None or lng is None:
+        return None
+    return cast(str, hass.data[DOMAIN]["tzf"].timezone_at(lat=lat, lng=lng))
+
+
+async def init_hass_data(hass: HomeAssistant) -> None:
+    """Get list of zones to use."""
+    if DOMAIN in hass.data:
+        return
+    hass.data[DOMAIN] = {}
 
     def create_timefinder() -> None:
         """Create timefinder object."""
@@ -24,20 +46,25 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         # This must be done in an executor since the timefinder constructor
         # does file I/O.
 
-        hass.data[DOMAIN] = TimezoneFinder()
+        hass.data[DOMAIN]["tzf"] = TimezoneFinder()
 
     await hass.async_add_executor_job(create_timefinder)
+
+    zones = []
+    for state in hass.states.async_all(zone.DOMAIN):
+        if get_tz_name(hass, state) != hass.config.time_zone:
+            zones.append(state.entity_id)
+    hass.data[DOMAIN]["zones"] = zones
+
+
+async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
+    """Set up composite integration."""
+    await init_hass_data(hass)
     return True
-
-
-# async def entry_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-#     """Handle config entry update."""
-#     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up config entry."""
-    # entry.async_on_unload(entry.add_update_listener(entry_updated))
 
     @callback
     def sensor_state_listener(event: Event) -> None:
@@ -52,7 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             or new_state.attributes.get(ATTR_LONGITUDE)
             != old_state.attributes.get(ATTR_LONGITUDE)
         ):
-            async_dispatcher_send(hass, SIG_ENTITY_CHANGED, new_state)
+            async_dispatcher_send(hass, signal(entry), new_state)
 
     entry.async_on_unload(
         async_track_state_change_event(

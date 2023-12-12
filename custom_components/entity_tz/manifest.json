@@ -3,7 +3,7 @@
   "name": "Entity Time Zone",
   "codeowners": ["@pnbruckner"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["zone"],
   "documentation": "https://github.com/pnbruckner/ha-entity-tz/blob/master/README.md",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
