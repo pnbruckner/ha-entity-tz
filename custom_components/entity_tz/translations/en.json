@@ -1,0 +1,13 @@
+{
+    "title": "Entity Time Zone",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Select Entity with Location",
+                "data": {
+                    "entity_id": "Entity"
+                }
+            }
+        }
+    }
+}
