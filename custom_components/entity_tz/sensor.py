@@ -68,7 +68,7 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity local time sensor entity."""
         entity_description = SensorEntityDescription(
-            key="Local Time",
+            key="Local time",
             entity_registry_enabled_default=False,
             icon="mdi:map-clock",
         )

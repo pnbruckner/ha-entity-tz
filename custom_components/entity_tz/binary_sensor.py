@@ -29,7 +29,7 @@ class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = BinarySensorEntityDescription(
-            key="Diff TZ",
+            key="Diff tz",
             entity_registry_enabled_default=False,
             icon="mdi:map-clock",
         )
