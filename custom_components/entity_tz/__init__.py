@@ -1,86 +1,21 @@
 """Entity Time Zone Sensor."""
 from __future__ import annotations
 
-from datetime import tzinfo
 import re
 
-from timezonefinder import TimezoneFinder
-
-from homeassistant.components import zone
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_LATITUDE,
-    ATTR_LONGITUDE,
-    CONF_ENTITY_ID,
-    EVENT_CORE_CONFIG_UPDATE,
-    EVENT_STATE_CHANGED,
-    Platform,
-)
-from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
+from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID, Platform
+from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
-import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN, SIG_ENTITY_CHANGED
+from .const import DOMAIN
+from .helpers import get_tz, init_hass_data, signal
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
 _OLD_UNIQUE_ID = re.compile(r"[0-9a-f]{32}")
-
-
-def signal(entry: ConfigEntry) -> str:
-    """Return signal name derived from config entry."""
-    return f"{SIG_ENTITY_CHANGED}-{entry.entry_id}"
-
-
-def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | None:
-    """Get time zone from latitude & longitude from state."""
-    if not state:
-        return None
-    lat = state.attributes.get(ATTR_LATITUDE)
-    lng = state.attributes.get(ATTR_LONGITUDE)
-    if lat is None or lng is None:
-        return None
-    tz_name = hass.data[DOMAIN]["tzf"].timezone_at(lat=lat, lng=lng)
-    if tz_name is None:
-        return None
-    return dt_util.get_time_zone(tz_name)
-
-
-async def init_hass_data(hass: HomeAssistant) -> None:
-    """Initialize integration's data."""
-    if DOMAIN in hass.data:
-        return
-    hass.data[DOMAIN] = {}
-
-    def create_timefinder() -> None:
-        """Create timefinder object."""
-
-        # This must be done in an executor since the timefinder constructor
-        # does file I/O.
-
-        hass.data[DOMAIN]["tzf"] = TimezoneFinder()
-
-    await hass.async_add_executor_job(create_timefinder)
-
-    @callback
-    def update_zones(_: Event | None = None) -> None:
-        """Update list of zones to use."""
-        zones = []
-        for state in hass.states.async_all(zone.DOMAIN):
-            if get_tz(hass, state) != dt_util.DEFAULT_TIME_ZONE:
-                zones.append(state.entity_id)
-        hass.data[DOMAIN]["zones"] = zones
-
-    @callback
-    def zones_filter(event: Event) -> bool:
-        """Return if the state changed event is for a zone."""
-        return split_entity_id(event.data["entity_id"])[0] == zone.DOMAIN
-
-    update_zones()
-    hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update_zones)
-    hass.bus.async_listen(EVENT_STATE_CHANGED, update_zones, zones_filter)
 
 
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:

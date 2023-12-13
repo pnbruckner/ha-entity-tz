@@ -15,8 +15,8 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
-from . import init_hass_data
 from .const import DOMAIN
+from .helpers import init_hass_data
 
 
 def _wrapped_entity_config_entry_title(
