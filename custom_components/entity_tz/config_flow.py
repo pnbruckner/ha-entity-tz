@@ -7,7 +7,10 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import geo_location, zone
+from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
+from homeassistant.components.geo_location import DOMAIN as GL_DOMAIN
+from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
+from homeassistant.components.zone import DOMAIN as ZONE_DOMAIN
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID
 from homeassistant.core import HomeAssistant, State, split_entity_id
@@ -41,16 +44,19 @@ def _use_state(
     """Determine if state represents an entity that should be listed as an option."""
     if not state:
         return False
-    if (domain := state.domain) in (geo_location.DOMAIN,):
+    if (entity_id := state.entity_id) in used_entity_ids:
+        return False
+    if (domain := state.domain) in (PERSON_DOMAIN, DT_DOMAIN):
+        return True
+    if domain in (ZONE_DOMAIN,):
+        return entity_id in hass.data[DOMAIN]["zones"]
+    if domain in (GL_DOMAIN,):
         return False
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
         return False
-    entity_id = state.entity_id
-    if domain == zone.DOMAIN and entity_id not in hass.data[DOMAIN]["zones"]:
-        return False
-    return entity_id not in used_entity_ids
+    return True
 
 
 class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):

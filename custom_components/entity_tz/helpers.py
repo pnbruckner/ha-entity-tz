@@ -91,11 +91,6 @@ class ETZSensor(Entity):
     """Base entity."""
 
     _attr_should_poll = False
-    _attr_device_info = DeviceInfo(
-        entry_type=DeviceEntryType.SERVICE,
-        identifiers={(DOMAIN, DOMAIN)},
-        name="Entity Time Zone",
-    )
     _tz: tzinfo | None
 
     def __init__(
@@ -105,6 +100,11 @@ class ETZSensor(Entity):
         domain: str,
     ) -> None:
         """Initialize sensor entity."""
+        self._attr_device_info = DeviceInfo(
+            entry_type=DeviceEntryType.SERVICE,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"{entry.title} Time Zone",
+        )
         self.entity_description = entity_description
         self.entity_description.name = f"{entry.title} {entity_description.key}"
         slug = slugify(entity_description.key)

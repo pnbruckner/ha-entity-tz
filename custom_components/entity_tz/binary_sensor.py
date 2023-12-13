@@ -31,7 +31,7 @@ class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
         entity_description = BinarySensorEntityDescription(
             key="Diff tz",
             entity_registry_enabled_default=False,
-            icon="mdi:map-clock",
+            icon="mdi:briefcase-clock",
         )
         super().__init__(entry, entity_description, BS_DOMAIN)
 

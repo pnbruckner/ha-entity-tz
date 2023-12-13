@@ -70,7 +70,7 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
         entity_description = SensorEntityDescription(
             key="Local time",
             entity_registry_enabled_default=False,
-            icon="mdi:map-clock",
+            icon="mdi:account-clock",
         )
         super().__init__(entry, entity_description, SENSOR_DOMAIN)
 

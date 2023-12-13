@@ -6,12 +6,10 @@ import re
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID, Platform
 from homeassistant.core import Event, HomeAssistant, State, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
 from .helpers import get_tz, init_hass_data, signal
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
@@ -21,16 +19,6 @@ _OLD_UNIQUE_ID = re.compile(r"[0-9a-f]{32}")
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     """Set up composite integration."""
     await init_hass_data(hass)
-
-    # From 1.0.0b2 or older: Convert unique_id from entry.entry_id -> entry.entry_id-time_zone
-    ent_reg = er.async_get(hass)
-    for entity in ent_reg.entities.values():
-        if entity.platform != DOMAIN:
-            continue
-        if _OLD_UNIQUE_ID.fullmatch(entity.unique_id):
-            new_unique_id = f"{entity.unique_id}-time_zone"
-            ent_reg.async_update_entity(entity.entity_id, new_unique_id=new_unique_id)
-
     return True
 
 
