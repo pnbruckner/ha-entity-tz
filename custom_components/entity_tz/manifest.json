@@ -8,5 +8,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
   "requirements": ["timezonefinder==5.2.0"],
-  "version": "1.0.0b4"
+  "version": "1.0.0b5"
 }
