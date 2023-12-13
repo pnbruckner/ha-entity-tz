@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback, EntityPla
 from homeassistant.helpers.event import async_track_time_change
 import homeassistant.util.dt as dt_util
 
-from .const import ATTR_UTC_OFFSET
+from .const import ATTR_UTC_OFFSET, LOCAL_TIME_ICON, TIME_ZONE_ICON
 from .helpers import ETZSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class EntityTimeZoneSensor(ETZSensor, SensorEntity):
         """Initialize entity time zone sensor entity."""
         entity_description = SensorEntityDescription(
             key="Time zone",
-            icon="mdi:map-clock",
+            icon=TIME_ZONE_ICON,
         )
         super().__init__(entry, entity_description, SENSOR_DOMAIN)
 
@@ -70,7 +70,7 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
         entity_description = SensorEntityDescription(
             key="Local time",
             entity_registry_enabled_default=False,
-            icon="mdi:account-clock",
+            icon=LOCAL_TIME_ICON,
         )
         super().__init__(entry, entity_description, SENSOR_DOMAIN)
 
