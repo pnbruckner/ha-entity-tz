@@ -1,7 +1,8 @@
 """Entity Time Zone Sensor."""
 from __future__ import annotations
 
-from typing import cast
+from datetime import tzinfo
+import re
 
 from timezonefinder import TimezoneFinder
 
@@ -16,13 +17,16 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
+import homeassistant.util.dt as dt_util
 
 from .const import DOMAIN, SIG_ENTITY_CHANGED
 
 PLATFORMS = [Platform.SENSOR]
+_OLD_UNIQUE_ID = re.compile(r"[0-9a-f]{32}")
 
 
 def signal(entry: ConfigEntry) -> str:
@@ -30,15 +34,18 @@ def signal(entry: ConfigEntry) -> str:
     return f"{SIG_ENTITY_CHANGED}-{entry.entry_id}"
 
 
-def get_tz_name(hass: HomeAssistant, state: State | None) -> str | None:
-    """Get time zone name from latitude & longitude from state."""
+def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | None:
+    """Get time zone from latitude & longitude from state."""
     if not state:
         return None
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
         return None
-    return cast(str, hass.data[DOMAIN]["tzf"].timezone_at(lat=lat, lng=lng))
+    tz_name = hass.data[DOMAIN]["tzf"].timezone_at(lat=lat, lng=lng)
+    if tz_name is None:
+        return None
+    return dt_util.get_time_zone(tz_name)
 
 
 async def init_hass_data(hass: HomeAssistant) -> None:
@@ -62,7 +69,7 @@ async def init_hass_data(hass: HomeAssistant) -> None:
         """Update list of zones to use."""
         zones = []
         for state in hass.states.async_all(zone.DOMAIN):
-            if get_tz_name(hass, state) != hass.config.time_zone:
+            if get_tz(hass, state) != dt_util.DEFAULT_TIME_ZONE:
                 zones.append(state.entity_id)
         hass.data[DOMAIN]["zones"] = zones
 
@@ -79,6 +86,16 @@ async def init_hass_data(hass: HomeAssistant) -> None:
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     """Set up composite integration."""
     await init_hass_data(hass)
+
+    # From 1.0.0b2 or older: Convert unique_id from entry.entry_id -> entry.entry_id-time_zone
+    ent_reg = er.async_get(hass)
+    for entity in ent_reg.entities.values():
+        if entity.platform != DOMAIN:
+            continue
+        if _OLD_UNIQUE_ID.fullmatch(entity.unique_id):
+            new_unique_id = f"{entity.unique_id}-time_zone"
+            ent_reg.async_update_entity(entity.entity_id, new_unique_id=new_unique_id)
+
     return True
 
 
@@ -98,7 +115,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             or new_state.attributes.get(ATTR_LONGITUDE)
             != old_state.attributes.get(ATTR_LONGITUDE)
         ):
-            async_dispatcher_send(hass, signal(entry), new_state)
+            async_dispatcher_send(hass, signal(entry), get_tz(hass, new_state))
 
     entry.async_on_unload(
         async_track_state_change_event(
