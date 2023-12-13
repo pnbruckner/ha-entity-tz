@@ -7,6 +7,8 @@ from typing import cast
 
 from timezonefinder import TimezoneFinder
 
+from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
+from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.components.zone import DOMAIN as ZONE_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -15,6 +17,7 @@ from homeassistant.const import (
     CONF_ENTITY_ID,
     EVENT_CORE_CONFIG_UPDATE,
     EVENT_STATE_CHANGED,
+    STATE_HOME,
 )
 from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
 from homeassistant.helpers.device_registry import DeviceEntryType
@@ -42,6 +45,8 @@ def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | None:
     """Get time zone from latitude & longitude from state."""
     if not state:
         return None
+    if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
+        return dt_util.DEFAULT_TIME_ZONE
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:

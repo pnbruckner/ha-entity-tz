@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import re
 
+from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
+from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID, Platform
+from homeassistant.const import (
+    ATTR_LATITUDE,
+    ATTR_LONGITUDE,
+    CONF_ENTITY_ID,
+    STATE_HOME,
+    Platform,
+)
 from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
@@ -31,8 +39,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         new_state: State | None = event.data["new_state"]
         old_state: State | None = event.data["old_state"]
         if (
-            not old_state
-            or not new_state
+            old_state is None
+            or new_state is None
+            or new_state.domain in (PERSON_DOMAIN, DT_DOMAIN)
+            and ((new_state.state == STATE_HOME) ^ (old_state.state == STATE_HOME))
             or new_state.attributes.get(ATTR_LATITUDE)
             != old_state.attributes.get(ATTR_LATITUDE)
             or new_state.attributes.get(ATTR_LONGITUDE)
