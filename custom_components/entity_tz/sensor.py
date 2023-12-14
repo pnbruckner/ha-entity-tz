@@ -5,11 +5,7 @@ import asyncio
 from datetime import datetime
 import logging
 
-from homeassistant.components.sensor import (
-    DOMAIN as SENSOR_DOMAIN,
-    SensorEntity,
-    SensorEntityDescription,
-)
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback, EntityPlatform
@@ -39,10 +35,10 @@ class EntityTimeZoneSensor(ETZSensor, SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = SensorEntityDescription(
-            key="time zone",
+            key="time_zone",
             icon=TIME_ZONE_ICON,
         )
-        super().__init__(entry, entity_description, SENSOR_DOMAIN)
+        super().__init__(entry, entity_description)
 
     async def async_update(self) -> None:
         """Update sensor."""
@@ -68,11 +64,11 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity local time sensor entity."""
         entity_description = SensorEntityDescription(
-            key="local time",
+            key="local_time",
             entity_registry_enabled_default=False,
             icon=LOCAL_TIME_ICON,
         )
-        super().__init__(entry, entity_description, SENSOR_DOMAIN)
+        super().__init__(entry, entity_description)
 
     @callback
     def add_to_platform_start(

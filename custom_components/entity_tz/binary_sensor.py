@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import (
-    DOMAIN as BS_DOMAIN,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
@@ -30,10 +29,10 @@ class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = BinarySensorEntityDescription(
-            key="diff tz",
+            key="diff_tz",
             entity_registry_enabled_default=False,
         )
-        super().__init__(entry, entity_description, BS_DOMAIN)
+        super().__init__(entry, entity_description)
 
     async def async_update(self) -> None:
         """Update sensor."""

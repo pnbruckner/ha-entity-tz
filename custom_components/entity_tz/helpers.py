@@ -31,7 +31,7 @@ except ImportError:
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.entity_platform import EntityPlatform
-from homeassistant.util import dt as dt_util, slugify
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, SIG_ENTITY_CHANGED
 
@@ -96,13 +96,13 @@ class ETZSensor(Entity):
     """Base entity."""
 
     _attr_should_poll = False
+    _attr_has_entity_name = True
     _tz: tzinfo | None
 
     def __init__(
         self,
         entry: ConfigEntry,
         entity_description: EntityDescription,
-        domain: str,
     ) -> None:
         """Initialize sensor entity."""
         self._attr_device_info = DeviceInfo(
@@ -110,12 +110,11 @@ class ETZSensor(Entity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
         )
+        key = entity_description.key
+        entity_description.translation_key = key
         self.entity_description = entity_description
-        self.entity_description.name = f"{entry.title} {entity_description.key}"
-        slug = slugify(entity_description.key)
-        self._attr_unique_id = f"{entry.entry_id}-{slug}"
+        self._attr_unique_id = f"{entry.entry_id}-{key}"
         self._entity_id = entry.data[CONF_ENTITY_ID]
-        self.entity_id = f"{domain}.{self._entity_id.split('.', 1)[1]}_{slug}"
 
     @callback
     def add_to_platform_start(

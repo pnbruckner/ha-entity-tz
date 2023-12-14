@@ -9,5 +9,23 @@
                 }
             }
         }
+    },
+    "entity": {
+        "binary_sensor": {
+            "diff_tz": {
+                "name": "diff tz"
+            }
+        },
+        "sensor": {
+            "local_time": {
+                "name": "local time"
+            },
+            "time_zone": {
+                "name": "time zone",
+                "state_attributes": {
+                    "utc_offset": {"name": "UTC offset"}
+                }
+            }
+        }
     }
 }
