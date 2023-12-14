@@ -30,7 +30,7 @@ class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = BinarySensorEntityDescription(
-            key="Diff tz",
+            key="diff tz",
             entity_registry_enabled_default=False,
         )
         super().__init__(entry, entity_description, BS_DOMAIN)

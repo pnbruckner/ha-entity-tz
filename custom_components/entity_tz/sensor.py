@@ -39,7 +39,7 @@ class EntityTimeZoneSensor(ETZSensor, SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = SensorEntityDescription(
-            key="Time zone",
+            key="time zone",
             icon=TIME_ZONE_ICON,
         )
         super().__init__(entry, entity_description, SENSOR_DOMAIN)
@@ -68,7 +68,7 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity local time sensor entity."""
         entity_description = SensorEntityDescription(
-            key="Local time",
+            key="local time",
             entity_registry_enabled_default=False,
             icon=LOCAL_TIME_ICON,
         )

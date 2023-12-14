@@ -108,7 +108,7 @@ class ETZSensor(Entity):
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, entry.entry_id)},
-            name=f"{entry.title} Time Zone",
+            name=entry.title,
         )
         self.entity_description = entity_description
         self.entity_description.name = f"{entry.title} {entity_description.key}"
