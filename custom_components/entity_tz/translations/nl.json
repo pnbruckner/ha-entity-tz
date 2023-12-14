@@ -1,0 +1,31 @@
+{
+    "title": "Tijdzone van entiteit",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Selecteer Entiteit met locatie",
+                "data": {
+                    "entity_id": "Entiteit"
+                }
+            }
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "diff_tz": {
+                "name": "andere tijdzone"
+            }
+        },
+        "sensor": {
+            "local_time": {
+                "name": "Lokale tijd"
+            },
+            "time_zone": {
+                "name": "tijdzone",
+                "state_attributes": {
+                    "utc_offset": {"name": "UTC-verschuiving"}
+                }
+            }
+        }
+    }
+}
