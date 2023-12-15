@@ -4,6 +4,8 @@ Creates several sensors that have information about the time zone in which anoth
 
 Type | Enabled by default | Description
 -|-|-
-Diff tz | no | Is `on` when the entity is in a different time zone than Home Assistant's configured time zone
-Local time | no | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time.
-Time zone | yes | The name of the time zone where the entity is located
+address | no | The address where the entity is located.
+county | no | The country the entity is in. Includes an attribute with the country code.
+different tz | no | Is `on` when the entity is in a different time zone than Home Assistant's configured time zone
+local time | no | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time.
+time zone | yes | The name of the time zone where the entity is located
