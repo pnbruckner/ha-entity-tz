@@ -4,9 +4,11 @@ Creates several sensors that have information about the time zone in which anoth
 
 Type | Enabled by default | Description
 -|-|-
-Diff tz | no | Is `on` when the entity is in a different time zone than Home Assistant's configured time zone
-Local time | no | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time.
-Time zone | yes | The name of the time zone where the entity is located
+address | no | The address where the entity is located.
+county | no | The country the entity is in. Includes an attribute with the country code.
+different tz | no | Is `on` when the entity is in a different time zone than Home Assistant's configured time zone
+local time | no | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time.
+time zone | yes | The name of the time zone where the entity is located
 
 ## Installation
 ### With HACS
@@ -34,14 +36,17 @@ where `<config>` is your Home Assistant configuration directory.
 
 This custom integration supports HomeAssistant versions 2023.4.0 or newer.
 
-## Local Time Sensor History
+## Sensor History
 
-When enabled, the "Local time" sensor will change its state every minute.
-This will cause a lot of data to get recorded that really isn't necessary.
+When enabled, the "local time" sensor will change its state every minute.
+Also, when enabled, the "address" sensor can update quite often, especially when the input device is moving.
+These will cause a lot of data to get recorded that really isn't useful.
+
 It is suggested, therefore, to add the following to your YAML configuration:
 ```yaml
 recorder:
   exclude:
     entity_globs:
+      - sensor.*_address
       - sensor.*_local_time
 ```
