@@ -19,7 +19,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import DOMAIN
-from .helpers import init_hass_data
+from .helpers import etz_data, init_etz_data
 
 
 def _wrapped_entity_config_entry_title(
@@ -49,7 +49,7 @@ def _use_state(
     if (domain := state.domain) in (PERSON_DOMAIN, DT_DOMAIN):
         return True
     if domain in (ZONE_DOMAIN,):
-        return entity_id in hass.data[DOMAIN]["zones"]
+        return entity_id in etz_data(hass).zones
     if domain in (GL_DOMAIN,):
         return False
     lat = state.attributes.get(ATTR_LATITUDE)
@@ -74,7 +74,7 @@ class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             return self.async_create_entry(title=title, data=user_input)
 
-        await init_hass_data(self.hass)
+        await init_etz_data(self.hass)
         used_entity_ids = [
             entry.data[CONF_ENTITY_ID]
             for entry in self.hass.config_entries.async_entries(DOMAIN)

@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DIFF_TZ_OFF_ICON, DIFF_TZ_ON_ICON
-from .helpers import ETZSensor
+from .helpers import ETZEntity, ETZSource
 
 
 async def async_setup_entry(
@@ -20,10 +20,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the binary sensor platform."""
-    async_add_entities([EntityDiffTZSensor(entry)], True)
+    async_add_entities([EntityDiffTZSensor(entry)])
 
 
-class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
+class EntityDiffTZSensor(ETZEntity, BinarySensorEntity):
     """Entity time zone sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
@@ -32,17 +32,14 @@ class EntityDiffTZSensor(ETZSensor, BinarySensorEntity):
             key="diff_tz",
             entity_registry_enabled_default=False,
         )
-        super().__init__(entry, entity_description)
+        super().__init__(entry, entity_description, (ETZSource.TZ, ETZSource.HA_CFG))
 
     async def async_update(self) -> None:
         """Update sensor."""
-        self._attr_available = False
         self._attr_icon = DIFF_TZ_OFF_ICON
-
-        if self._tz is None:
+        if not self._sources_valid:
             return
 
-        self._attr_available = True
-        self._attr_is_on = self._tz != dt_util.DEFAULT_TIME_ZONE
+        self._attr_is_on = self._entity_tz != dt_util.DEFAULT_TIME_ZONE
         if self.is_on:
             self._attr_icon = DIFF_TZ_ON_ICON

@@ -13,10 +13,19 @@
     "entity": {
         "binary_sensor": {
             "diff_tz": {
-                "name": "diff tz"
+                "name": "different tz"
             }
         },
         "sensor": {
+            "address": {
+                "name": "address"
+            },
+            "country": {
+                "name": "country",
+                "state_attributes": {
+                    "country_code": {"name:": "Country code"}
+                }
+            },
             "local_time": {
                 "name": "local time"
             },

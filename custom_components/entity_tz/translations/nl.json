@@ -17,6 +17,15 @@
             }
         },
         "sensor": {
+            "address": {
+                "name": "adres"
+            },
+            "country": {
+                "name": "land",
+                "state_attributes": {
+                    "country_code": {"name:": "Landcode"}
+                }
+            },
             "local_time": {
                 "name": "Lokale tijd"
             },

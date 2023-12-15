@@ -1,21 +1,21 @@
 """Entity Time Zone Sensor."""
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime
-import logging
-
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback, EntityPlatform
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.util.dt as dt_util
 
-from .const import ATTR_UTC_OFFSET, LOCAL_TIME_ICON, TIME_ZONE_ICON
-from .helpers import ETZSensor
-
-_LOGGER = logging.getLogger(__name__)
+from .const import (
+    ADDRESS_ICON,
+    ATTR_COUNTRY_CODE,
+    ATTR_UTC_OFFSET,
+    COUNTRY_ICON,
+    LOCAL_TIME_ICON,
+    TIME_ZONE_ICON,
+)
+from .helpers import ETZEntity, ETZSource
 
 
 async def async_setup_entry(
@@ -24,41 +24,53 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    async_add_entities(
-        [EntityTimeZoneSensor(entry), EntityLocalTimeSensor(entry)], True
-    )
+    async_add_entities([cls(entry) for cls in _SENSORS])
 
 
-class EntityTimeZoneSensor(ETZSensor, SensorEntity):
-    """Entity time zone sensor entity."""
+class EntityAddressSensor(ETZEntity, SensorEntity):
+    """Entity address sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize entity time zone sensor entity."""
+        """Initialize entity address sensor entity."""
         entity_description = SensorEntityDescription(
-            key="time_zone",
-            icon=TIME_ZONE_ICON,
+            key="address",
+            entity_registry_enabled_default=False,
+            icon=ADDRESS_ICON,
         )
-        super().__init__(entry, entity_description)
+        super().__init__(entry, entity_description, (ETZSource.LOC,))
 
     async def async_update(self) -> None:
         """Update sensor."""
-        self._attr_available = False
-
-        if self._tz is None:
+        if not self._sources_valid:
             return
 
-        self._attr_available = True
-        self._attr_native_value = str(self._tz)
+        self._attr_native_value = self._entity_loc.address
 
-        self._attr_extra_state_attributes = {}
-        if (offset := dt_util.now().astimezone(self._tz).utcoffset()) is None:
-            return
-        self._attr_extra_state_attributes[ATTR_UTC_OFFSET] = (
-            offset.total_seconds() / 3600
+
+class EntityCountrySensor(ETZEntity, SensorEntity):
+    """Entity country sensor entity."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialize entity address sensor entity."""
+        entity_description = SensorEntityDescription(
+            key="country",
+            entity_registry_enabled_default=False,
+            icon=COUNTRY_ICON,
         )
+        super().__init__(entry, entity_description, (ETZSource.LOC,))
+
+    async def async_update(self) -> None:
+        """Update sensor."""
+        self._attr_extra_state_attributes = {ATTR_COUNTRY_CODE: None}
+        if not self._sources_valid:
+            return
+
+        address = self._entity_loc.raw["address"]
+        self._attr_native_value = address["country"]
+        self._attr_extra_state_attributes[ATTR_COUNTRY_CODE] = address["country_code"]
 
 
-class EntityLocalTimeSensor(ETZSensor, SensorEntity):
+class EntityLocalTimeSensor(ETZEntity, SensorEntity):
     """Entity local time sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
@@ -68,34 +80,47 @@ class EntityLocalTimeSensor(ETZSensor, SensorEntity):
             entity_registry_enabled_default=False,
             icon=LOCAL_TIME_ICON,
         )
-        super().__init__(entry, entity_description)
-
-    @callback
-    def add_to_platform_start(
-        self,
-        hass: HomeAssistant,
-        platform: EntityPlatform,
-        parallel_updates: asyncio.Semaphore | None,
-    ) -> None:
-        """Start adding an entity to a platform."""
-        super().add_to_platform_start(hass, platform, parallel_updates)
-
-        @callback
-        def time_changed(_: datetime) -> None:
-            """Handle entity change."""
-            self.async_schedule_update_ha_state(True)
-
-        self.async_on_remove(async_track_time_change(self.hass, time_changed, second=0))
+        super().__init__(entry, entity_description, (ETZSource.TIME, ETZSource.TZ))
 
     async def async_update(self) -> None:
         """Update sensor."""
-        self._attr_available = False
-
-        if self._tz is None:
+        if not self._sources_valid:
             return
 
-        self._attr_available = True
-        state = dt_util.now(self._tz).time().isoformat("minutes")
-        if state[0] == "0":
-            state = state[1:]
-        self._attr_native_value = state
+        value = dt_util.now(self._entity_tz).time().isoformat("minutes")
+        if value[0] == "0":
+            value = value[1:]
+        self._attr_native_value = value
+
+
+class EntityTimeZoneSensor(ETZEntity, SensorEntity):
+    """Entity time zone sensor entity."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialize entity time zone sensor entity."""
+        entity_description = SensorEntityDescription(
+            key="time_zone",
+            icon=TIME_ZONE_ICON,
+        )
+        super().__init__(entry, entity_description, (ETZSource.TZ,))
+
+    async def async_update(self) -> None:
+        """Update sensor."""
+        self._attr_extra_state_attributes = {ATTR_UTC_OFFSET: None}
+        if not self._sources_valid:
+            return
+
+        self._attr_native_value = str(self._entity_tz)
+        if (offset := dt_util.now().astimezone(self._entity_tz).utcoffset()) is None:
+            return
+        self._attr_extra_state_attributes[ATTR_UTC_OFFSET] = (
+            offset.total_seconds() / 3600
+        )
+
+
+_SENSORS = (
+    EntityAddressSensor,
+    EntityCountrySensor,
+    EntityLocalTimeSensor,
+    EntityTimeZoneSensor,
+)
