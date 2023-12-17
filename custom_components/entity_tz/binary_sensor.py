@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DIFF_TZ_OFF_ICON, DIFF_TZ_ON_ICON
+from .const import DIFF_TIME_OFF_ICON, DIFF_TIME_ON_ICON
 from .helpers import ETZEntity, ETZSource
 
 
@@ -29,17 +29,20 @@ class EntityDiffTZSensor(ETZEntity, BinarySensorEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize entity time zone sensor entity."""
         entity_description = BinarySensorEntityDescription(
-            key="diff_tz",
+            key="diff_time",
             entity_registry_enabled_default=False,
         )
         super().__init__(entry, entity_description, (ETZSource.TZ, ETZSource.HA_CFG))
 
     async def async_update(self) -> None:
         """Update sensor."""
-        self._attr_icon = DIFF_TZ_OFF_ICON
+        self._attr_icon = DIFF_TIME_OFF_ICON
         if not self._sources_valid:
             return
 
-        self._attr_is_on = self._entity_tz != dt_util.DEFAULT_TIME_ZONE
+        n = dt_util.now()
+        self._attr_is_on = n.astimezone(self._entity_tz).replace(
+            tzinfo=None
+        ) != n.replace(tzinfo=None)
         if self.is_on:
-            self._attr_icon = DIFF_TZ_ON_ICON
+            self._attr_icon = DIFF_TIME_ON_ICON

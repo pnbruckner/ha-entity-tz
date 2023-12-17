@@ -12,8 +12,8 @@
     },
     "entity": {
         "binary_sensor": {
-            "diff_tz": {
-                "name": "andere tijdzone"
+            "diff_time": {
+                "name": "andere tijd"
             }
         },
         "sensor": {
@@ -23,7 +23,7 @@
             "country": {
                 "name": "land",
                 "state_attributes": {
-                    "country_code": {"name:": "Landcode"}
+                    "country_code": {"name": "Landcode"}
                 }
             },
             "local_time": {

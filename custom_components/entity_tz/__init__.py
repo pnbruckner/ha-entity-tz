@@ -12,12 +12,15 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import Event, HomeAssistant, State, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
 
-from .helpers import get_location, get_tz, init_etz_data, signal
+from .const import DOMAIN
+from .helpers import etz_data, get_location, get_tz, init_etz_data, signal
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 
@@ -29,7 +32,11 @@ async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up config entry."""
+    etz_data(hass).loc_users[entry.entry_id] = 0
+    etz_data(hass).tz_users[entry.entry_id] = 0
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     entity_id = entry.data[CONF_ENTITY_ID]
 
     async def update_from_entity(event: Event | None = None) -> None:
@@ -50,12 +57,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             or new_state.attributes.get(ATTR_LONGITUDE)
             != old_state.attributes.get(ATTR_LONGITUDE)
         ):
-            async_dispatcher_send(
-                hass,
-                signal(entry),
-                await get_location(hass, new_state),
-                get_tz(hass, new_state),
-            )
+            if etz_data(hass).loc_users[entry.entry_id]:
+                entity_loc = await get_location(hass, new_state)
+            else:
+                entity_loc = None
+            if etz_data(hass).tz_users[entry.entry_id]:
+                entity_tz = get_tz(hass, new_state)
+            else:
+                entity_tz = None
+            async_dispatcher_send(hass, signal(entry), entity_loc, entity_tz)
 
     @callback
     def sensor_state_listener(event: Event) -> None:
@@ -75,4 +85,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    res = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    loc_users = etz_data(hass).loc_users.pop(entry.entry_id)
+    tz_uers = etz_data(hass).tz_users.pop(entry.entry_id)
+    assert not loc_users
+    assert not tz_uers
+    return res

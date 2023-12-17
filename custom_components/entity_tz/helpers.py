@@ -6,6 +6,7 @@ from collections.abc import Container
 from dataclasses import dataclass
 from datetime import tzinfo
 from enum import Enum, auto
+import logging
 from typing import Any, cast
 
 from geopy.adapters import AioHTTPAdapter
@@ -41,11 +42,12 @@ except ImportError:
 
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity, EntityDescription
-from homeassistant.helpers.entity_platform import EntityPlatform
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, NOM_TIMEOUT, SIG_ENTITY_CHANGED
+from .const import DOMAIN, NOM_TIMEOUT, NOM_WAIT, SIG_ENTITY_CHANGED
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(init=False)
@@ -53,8 +55,10 @@ class ETZData:
     """Entity Time Zone integration data."""
 
     nominatim: Nominatim
+    loc_users: dict[str, int]
     query_lock: asyncio.Lock
     tzf: TimezoneFinder
+    tz_users: dict[str, int]
     zones: list[str]
 
 
@@ -68,6 +72,8 @@ async def init_etz_data(hass: HomeAssistant) -> None:
     if DOMAIN in hass.data:
         return
     hass.data[DOMAIN] = ETZData()
+    etz_data(hass).loc_users = {}
+    etz_data(hass).tz_users = {}
 
     nominatim = Nominatim(
         user_agent=SERVER_SOFTWARE,
@@ -136,18 +142,22 @@ async def get_location(
     if lat is None or lng is None:
         return STATE_UNAVAILABLE
 
-    coordinates = f"{lat}, {lng}"
     lock = etz_data(hass).query_lock
-    await lock.acquire()
-    location = await etz_data(hass).nominatim.reverse(coordinates)
 
     async def limit_rate() -> None:
         """Hold the lock to limit calls to server."""
-        await asyncio.sleep(2)
+        await asyncio.sleep(NOM_WAIT)
         lock.release()
 
-    hass.async_create_task(limit_rate())
-    return location
+    coordinates = f"{lat}, {lng}"
+    await lock.acquire()
+    try:
+        return await etz_data(hass).nominatim.reverse(coordinates)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        _LOGGER.error("While getting address & country code: %s", exc)
+        return None
+    finally:
+        hass.async_create_task(limit_rate())
 
 
 def signal(entry: ConfigEntry) -> str:
@@ -200,15 +210,9 @@ class ETZEntity(Entity):
             return False
         return True
 
-    @callback
-    def add_to_platform_start(
-        self,
-        hass: HomeAssistant,
-        platform: EntityPlatform,
-        parallel_updates: asyncio.Semaphore | None,
-    ) -> None:
-        """Start adding an entity to a platform."""
-        super().add_to_platform_start(hass, platform, parallel_updates)
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added to hass."""
+        config_entry = cast(ConfigEntry, self.platform.config_entry)
 
         @callback
         def entity_changed(
@@ -219,12 +223,16 @@ class ETZEntity(Entity):
             self._ent_tz = entity_tz
             self.async_schedule_update_ha_state(True)
 
-        if any(source in self._sources for source in (ETZSource.TZ, ETZSource.LOC)):
+        loc_user = ETZSource.LOC in self._sources
+        tz_user = ETZSource.TZ in self._sources
+        if loc_user or tz_user:
+            if loc_user:
+                etz_data(self.hass).loc_users[config_entry.entry_id] += 1
+            if tz_user:
+                etz_data(self.hass).tz_users[config_entry.entry_id] += 1
             self.async_on_remove(
                 async_dispatcher_connect(
-                    hass,
-                    signal(cast(ConfigEntry, self.platform.config_entry)),
-                    entity_changed,
+                    self.hass, signal(config_entry), entity_changed
                 )
             )
 
@@ -235,11 +243,19 @@ class ETZEntity(Entity):
 
         if ETZSource.HA_CFG in self._sources:
             self.async_on_remove(
-                hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update)
+                self.hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update)
             )
 
         if ETZSource.TIME in self._sources:
             self.async_on_remove(async_track_time_change(self.hass, update, second=0))
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity will be removed from hass."""
+        config_entry = cast(ConfigEntry, self.platform.config_entry)
+        if ETZSource.LOC in self._sources:
+            etz_data(self.hass).loc_users[config_entry.entry_id] -= 1
+        if ETZSource.TZ in self._sources:
+            etz_data(self.hass).tz_users[config_entry.entry_id] -= 1
 
     @property
     def _sources_valid(self) -> bool:
