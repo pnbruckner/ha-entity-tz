@@ -200,6 +200,8 @@ class ETZEntity(Entity):
         self.entity_description = entity_description
         self._attr_unique_id = f"{entry.entry_id}-{key}"
         self._sources = sources
+        if ETZSource.LOC in sources:
+            self._attr_attribution = "Map data from OpenStreetMap"
 
     @property
     def available(self) -> bool:
