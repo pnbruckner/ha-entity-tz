@@ -3,15 +3,22 @@
     "config": {
         "step": {
             "user": {
-                "title": "Select Entity with Location",
+                "title": "Select Entity or Specify Time Zone",
                 "data": {
-                    "entity_id": "Entity"
+                    "entity_id": "Entity",
+                    "time_zone": "Time zone"
                 }
             }
+        },
+        "error": {
+            "specify_one": "Fill in one and only one option"
         }
     },
     "entity": {
         "binary_sensor": {
+            "diff_country": {
+                "name": "different country"
+            },
             "diff_time": {
                 "name": "different time"
             }

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_TIME_ZONE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.util.dt as dt_util
@@ -24,19 +25,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    async_add_entities([cls(entry) for cls in _SENSORS])
+    if CONF_TIME_ZONE in entry.data:
+        async_add_entities([EntityLocalTimeSensor(entry)])
+    else:
+        async_add_entities([cls(entry) for cls in _SENSORS])
 
 
 class EntityAddressSensor(ETZEntity, SensorEntity):
     """Entity address sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize entity address sensor entity."""
-        entity_description = SensorEntityDescription(
-            key="address",
-            entity_registry_enabled_default=False,
-            icon=ADDRESS_ICON,
-        )
+        """Initialize the entity."""
+        entity_description = SensorEntityDescription(key="address", icon=ADDRESS_ICON)
         super().__init__(entry, entity_description, (ETZSource.LOC,))
 
     async def async_update(self) -> None:
@@ -51,12 +51,8 @@ class EntityCountrySensor(ETZEntity, SensorEntity):
     """Entity country sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize entity address sensor entity."""
-        entity_description = SensorEntityDescription(
-            key="country",
-            entity_registry_enabled_default=False,
-            icon=COUNTRY_ICON,
-        )
+        """Initialize the entity."""
+        entity_description = SensorEntityDescription(key="country", icon=COUNTRY_ICON)
         super().__init__(entry, entity_description, (ETZSource.LOC,))
 
     async def async_update(self) -> None:
@@ -67,18 +63,18 @@ class EntityCountrySensor(ETZEntity, SensorEntity):
 
         address = self._entity_loc.raw["address"]
         self._attr_native_value = address["country"]
-        self._attr_extra_state_attributes[ATTR_COUNTRY_CODE] = address["country_code"]
+        self._attr_extra_state_attributes[ATTR_COUNTRY_CODE] = address[
+            "country_code"
+        ].upper()
 
 
 class EntityLocalTimeSensor(ETZEntity, SensorEntity):
     """Entity local time sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize entity local time sensor entity."""
+        """Initialize the entity."""
         entity_description = SensorEntityDescription(
-            key="local_time",
-            entity_registry_enabled_default=False,
-            icon=LOCAL_TIME_ICON,
+            key="local_time", icon=LOCAL_TIME_ICON
         )
         super().__init__(entry, entity_description, (ETZSource.TIME, ETZSource.TZ))
 
@@ -97,10 +93,9 @@ class EntityTimeZoneSensor(ETZEntity, SensorEntity):
     """Entity time zone sensor entity."""
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize entity time zone sensor entity."""
+        """Initialize the entity."""
         entity_description = SensorEntityDescription(
-            key="time_zone",
-            icon=TIME_ZONE_ICON,
+            key="time_zone", icon=TIME_ZONE_ICON
         )
         super().__init__(entry, entity_description, (ETZSource.TZ,))
 

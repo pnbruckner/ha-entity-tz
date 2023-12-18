@@ -3,6 +3,8 @@ DOMAIN = "entity_tz"
 
 ADDRESS_ICON = "mdi:map-marker"
 COUNTRY_ICON = "mdi:web"
+DIFF_COUNTRY_OFF_ICON = "mdi:home-city"
+DIFF_COUNTRY_ON_ICON = "mdi:city"
 DIFF_TIME_OFF_ICON = "mdi:home-clock"
 DIFF_TIME_ON_ICON = "mdi:briefcase-clock"
 LOCAL_TIME_ICON = "mdi:account-clock"

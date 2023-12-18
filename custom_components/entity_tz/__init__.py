@@ -8,6 +8,7 @@ from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
     CONF_ENTITY_ID,
+    CONF_TIME_ZONE,
     STATE_HOME,
     Platform,
 )
@@ -16,6 +17,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .helpers import etz_data, get_location, get_tz, init_etz_data, signal
@@ -36,6 +38,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     etz_data(hass).tz_users[entry.entry_id] = 0
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    if (tz_name := entry.data.get(CONF_TIME_ZONE)) is not None:
+        async_dispatcher_send(hass, signal(entry), None, dt_util.get_time_zone(tz_name))
+        return True
 
     entity_id = entry.data[CONF_ENTITY_ID]
 

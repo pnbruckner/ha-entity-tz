@@ -12,11 +12,20 @@ from homeassistant.components.geo_location import DOMAIN as GL_DOMAIN
 from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.components.zone import DOMAIN as ZONE_DOMAIN
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_ENTITY_ID
+from homeassistant.const import (
+    ATTR_LATITUDE,
+    ATTR_LONGITUDE,
+    CONF_ENTITY_ID,
+    CONF_TIME_ZONE,
+)
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    TextSelector,
+)
 
 from .const import DOMAIN
 from .helpers import etz_data, init_etz_data
@@ -38,7 +47,7 @@ def _wrapped_entity_config_entry_title(
     return object_id
 
 
-def _use_state(
+def _list_entity(
     hass: HomeAssistant, used_entity_ids: Iterable[str], state: State
 ) -> bool:
     """Determine if state represents an entity that should be listed as an option."""
@@ -68,29 +77,52 @@ class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Start user config flow."""
+        errors = {}
+
         if user_input is not None:
-            title = _wrapped_entity_config_entry_title(
-                self.hass, user_input[CONF_ENTITY_ID]
-            )
-            return self.async_create_entry(title=title, data=user_input)
+            if len(user_input) != 1:
+                errors["base"] = "specify_one"
+            else:
+                if (tz := user_input.get(CONF_TIME_ZONE)) is not None:
+                    try:
+                        cv.time_zone(tz)
+                        title = tz
+                    except vol.Invalid:
+                        title = tz.title()
+                        tz_suffix = title.replace(" ", "_")
+                        for tz_name in etz_data(self.hass).tzs:
+                            if tz_name.endswith(tz_suffix):
+                                user_input[CONF_TIME_ZONE] = tz_name
+                                break
+                        else:
+                            cv.time_zone(tz)
+                else:
+                    title = _wrapped_entity_config_entry_title(
+                        self.hass, user_input[CONF_ENTITY_ID]
+                    )
+                return self.async_create_entry(title=title, data=user_input)
 
         await init_etz_data(self.hass)
         used_entity_ids = [
             entry.data[CONF_ENTITY_ID]
             for entry in self.hass.config_entries.async_entries(DOMAIN)
+            if CONF_ENTITY_ID in entry.data
         ]
         entity_ids = [
             state.entity_id
             for state in filter(
-                partial(_use_state, self.hass, used_entity_ids),
+                partial(_list_entity, self.hass, used_entity_ids),
                 self.hass.states.async_all(),
             )
         ]
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_ENTITY_ID): EntitySelector(
+                vol.Optional(CONF_ENTITY_ID): EntitySelector(
                     EntitySelectorConfig(include_entities=entity_ids)
                 ),
+                vol.Optional(CONF_TIME_ZONE): TextSelector(),
             }
         )
-        return self.async_show_form(step_id="user", data_schema=data_schema)
+        return self.async_show_form(
+            step_id="user", data_schema=data_schema, errors=errors
+        )

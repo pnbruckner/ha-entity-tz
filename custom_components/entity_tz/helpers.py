@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Container
+from collections.abc import Container, Mapping
 from dataclasses import dataclass
 from datetime import tzinfo
 from enum import Enum, auto
 import logging
 from typing import Any, cast
+from zoneinfo import available_timezones
 
 from geopy.adapters import AioHTTPAdapter
 from geopy.geocoders import Nominatim
@@ -22,6 +23,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
+    CONF_ENTITY_ID,
+    CONF_TIME_ZONE,
     EVENT_CORE_CONFIG_UPDATE,
     EVENT_STATE_CHANGED,
     STATE_HOME,
@@ -54,6 +57,7 @@ _LOGGER = logging.getLogger(__name__)
 class ETZData:
     """Entity Time Zone integration data."""
 
+    tzs: set[str]
     nominatim: Nominatim
     loc_users: dict[str, int]
     query_lock: asyncio.Lock
@@ -86,15 +90,16 @@ async def init_etz_data(hass: HomeAssistant) -> None:
     etz_data(hass).nominatim = nominatim
     etz_data(hass).query_lock = asyncio.Lock()
 
-    def create_timefinder() -> None:
-        """Create timefinder object."""
+    def init_tz_data() -> None:
+        """Initialize time zone data."""
 
-        # This must be done in an executor since the timefinder constructor
-        # does file I/O.
+        # This must be done in an executor since zoneinfo.available_timezones and the
+        # timefinder constructor both do file I/O.
 
+        etz_data(hass).tzs = available_timezones()
         etz_data(hass).tzf = TimezoneFinder()
 
-    await hass.async_add_executor_job(create_timefinder)
+    await hass.async_add_executor_job(init_tz_data)
 
     @callback
     def update_zones(_: Event | None = None) -> None:
@@ -165,6 +170,23 @@ def signal(entry: ConfigEntry) -> str:
     return f"{SIG_ENTITY_CHANGED}-{entry.entry_id}"
 
 
+_ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
+
+
+def _enable_entity(key: str, entry_data: Mapping[str, Any]) -> bool:
+    """Determine if entity should be enabled by default."""
+    if key in _ALWAYS_DISABLED_ENTITIES:
+        return False
+    static_tz_or_zone = (
+        CONF_TIME_ZONE in entry_data
+        or split_entity_id(entry_data[CONF_ENTITY_ID])[0] == ZONE_DOMAIN
+    )
+    if key == "local_time":
+        return static_tz_or_zone
+    assert key == "time_zone"
+    return not static_tz_or_zone
+
+
 class ETZSource(Enum):
     """Source of state."""
 
@@ -196,6 +218,8 @@ class ETZEntity(Entity):
             name=entry.title,
         )
         key = entity_description.key
+        enable = _enable_entity(key, entry.data)
+        entity_description.entity_registry_enabled_default = enable
         entity_description.translation_key = key
         self.entity_description = entity_description
         self._attr_unique_id = f"{entry.entry_id}-{key}"

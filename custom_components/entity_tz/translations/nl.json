@@ -5,13 +5,20 @@
             "user": {
                 "title": "Selecteer Entiteit met locatie",
                 "data": {
-                    "entity_id": "Entiteit"
+                    "entity_id": "Entiteit",
+                    "time_zone": "Tijdzone"
                 }
             }
+        },
+        "error": {
+            "specify_one": "Vul één en slechts één optie in"
         }
     },
     "entity": {
         "binary_sensor": {
+            "diff_country": {
+                "name": "ander land"
+            },
             "diff_time": {
                 "name": "andere tijd"
             }
