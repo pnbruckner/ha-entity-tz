@@ -94,7 +94,7 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         """Initialize time zone data."""
 
         # This must be done in an executor since zoneinfo.available_timezones and the
-        # timefinder constructor both do file I/O.
+        # TimezoneFinder constructor both do file I/O.
 
         etz_data(hass).tzs = available_timezones()
         etz_data(hass).tzf = TimezoneFinder()
@@ -162,7 +162,7 @@ async def get_location(
         _LOGGER.error("While getting address & country code: %s", exc)
         return None
     finally:
-        hass.async_create_task(limit_rate())
+        hass.async_create_background_task(limit_rate(), "Limit nominatim query rate")
 
 
 def signal(entry: ConfigEntry) -> str:
