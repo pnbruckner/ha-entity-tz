@@ -1,17 +1,13 @@
 """Entity Time Zone Sensor Helpers."""
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Container, Mapping
 from dataclasses import dataclass
 from datetime import tzinfo
 from enum import Enum, auto
-import logging
 from typing import Any, cast
 from zoneinfo import available_timezones
 
-from geopy.adapters import AioHTTPAdapter
-from geopy.geocoders import Nominatim
 from geopy.location import Location
 from timezonefinder import TimezoneFinder
 
@@ -31,10 +27,6 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
 )
 from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
-from homeassistant.helpers.aiohttp_client import (
-    SERVER_SOFTWARE,
-    async_get_clientsession,
-)
 from homeassistant.helpers.device_registry import DeviceEntryType
 
 # Device Info moved to device_registry in 2023.9
@@ -48,20 +40,20 @@ from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, NOM_TIMEOUT, NOM_WAIT, SIG_ENTITY_CHANGED
+from .const import DOMAIN, SIG_ENTITY_CHANGED
+from .nominatim import get_location, init_nominatim
 
-_LOGGER = logging.getLogger(__name__)
+_ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
 
 
 @dataclass(init=False)
 class ETZData:
     """Entity Time Zone integration data."""
 
-    tzs: set[str]
-    nominatim: Nominatim
+    loc_available: bool
     loc_users: dict[str, int]
-    query_lock: asyncio.Lock
     tzf: TimezoneFinder
+    tzs: set[str]
     tz_users: dict[str, int]
     zones: list[str]
 
@@ -75,29 +67,19 @@ async def init_etz_data(hass: HomeAssistant) -> None:
     """Initialize integration's data."""
     if DOMAIN in hass.data:
         return
-    hass.data[DOMAIN] = ETZData()
-    etz_data(hass).loc_users = {}
-    etz_data(hass).tz_users = {}
-
-    nominatim = Nominatim(
-        user_agent=SERVER_SOFTWARE,
-        timeout=NOM_TIMEOUT,
-        adapter_factory=lambda proxies, ssl_context: AioHTTPAdapter(
-            proxies=proxies, ssl_context=ssl_context
-        ),
-    )
-    nominatim.adapter.__dict__["session"] = async_get_clientsession(hass)
-    etz_data(hass).nominatim = nominatim
-    etz_data(hass).query_lock = asyncio.Lock()
+    hass.data[DOMAIN] = etzd = ETZData()
+    etzd.loc_available = init_nominatim(hass)
+    etzd.loc_users = {}
+    etzd.tz_users = {}
 
     def init_tz_data() -> None:
-        """Initialize time zone data."""
+        """Initialize time zone data.
 
-        # This must be done in an executor since zoneinfo.available_timezones and the
-        # TimezoneFinder constructor both do file I/O.
-
-        etz_data(hass).tzs = available_timezones()
-        etz_data(hass).tzf = TimezoneFinder()
+        This must be done in an executor since TimezoneFinder constructor and
+        zoneinfo.available_timezones both do file I/O.
+        """
+        etzd.tzf = TimezoneFinder()
+        etzd.tzs = available_timezones()
 
     await hass.async_add_executor_job(init_tz_data)
 
@@ -108,7 +90,7 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         for state in hass.states.async_all(ZONE_DOMAIN):
             if get_tz(hass, state) != dt_util.DEFAULT_TIME_ZONE:
                 zones.append(state.entity_id)
-        etz_data(hass).zones = zones
+        etzd.zones = zones
 
     @callback
     def zones_filter(event: Event) -> bool:
@@ -121,7 +103,7 @@ async def init_etz_data(hass: HomeAssistant) -> None:
 
 
 def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
-    """Get time zone from latitude & longitude from state."""
+    """Get time zone from entity state."""
     if not state:
         return STATE_UNAVAILABLE
     if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
@@ -136,10 +118,8 @@ def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
     return dt_util.get_time_zone(tz_name)
 
 
-async def get_location(
-    hass: HomeAssistant, state: State | None
-) -> Location | str | None:
-    """Get address from latitude & longitude."""
+async def get_loc(hass: HomeAssistant, state: State | None) -> Location | str | None:
+    """Get location data from entity state."""
     if state is None:
         return STATE_UNAVAILABLE
     lat = state.attributes.get(ATTR_LATITUDE)
@@ -147,30 +127,12 @@ async def get_location(
     if lat is None or lng is None:
         return STATE_UNAVAILABLE
 
-    lock = etz_data(hass).query_lock
-
-    async def limit_rate() -> None:
-        """Hold the lock to limit calls to server."""
-        await asyncio.sleep(NOM_WAIT)
-        lock.release()
-
-    coordinates = f"{lat}, {lng}"
-    await lock.acquire()
-    try:
-        return await etz_data(hass).nominatim.reverse(coordinates)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        _LOGGER.error("While getting address & country code: %s", exc)
-        return None
-    finally:
-        hass.async_create_background_task(limit_rate(), "Limit nominatim query rate")
+    return await get_location(hass, lat, lng)
 
 
 def signal(entry: ConfigEntry) -> str:
     """Return signal name derived from config entry."""
     return f"{SIG_ENTITY_CHANGED}-{entry.entry_id}"
-
-
-_ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
 
 
 def _enable_entity(key: str, entry_data: Mapping[str, Any]) -> bool:
@@ -252,10 +214,11 @@ class ETZEntity(Entity):
         loc_user = ETZSource.LOC in self._sources
         tz_user = ETZSource.TZ in self._sources
         if loc_user or tz_user:
+            etzd = etz_data(self.hass)
             if loc_user:
-                etz_data(self.hass).loc_users[config_entry.entry_id] += 1
+                etzd.loc_users[config_entry.entry_id] += 1
             if tz_user:
-                etz_data(self.hass).tz_users[config_entry.entry_id] += 1
+                etzd.tz_users[config_entry.entry_id] += 1
             self.async_on_remove(
                 async_dispatcher_connect(
                     self.hass, signal(config_entry), entity_changed
@@ -278,10 +241,11 @@ class ETZEntity(Entity):
     async def async_will_remove_from_hass(self) -> None:
         """Run when entity will be removed from hass."""
         config_entry = cast(ConfigEntry, self.platform.config_entry)
+        etzd = etz_data(self.hass)
         if ETZSource.LOC in self._sources:
-            etz_data(self.hass).loc_users[config_entry.entry_id] -= 1
+            etzd.loc_users[config_entry.entry_id] -= 1
         if ETZSource.TZ in self._sources:
-            etz_data(self.hass).tz_users[config_entry.entry_id] -= 1
+            etzd.tz_users[config_entry.entry_id] -= 1
 
     @property
     def _sources_valid(self) -> bool:

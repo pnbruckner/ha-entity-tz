@@ -20,7 +20,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .helpers import etz_data, get_location, get_tz, init_etz_data, signal
+from .helpers import etz_data, get_loc, get_tz, init_etz_data, signal
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
@@ -34,8 +34,9 @@ async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up config entry."""
-    etz_data(hass).loc_users[entry.entry_id] = 0
-    etz_data(hass).tz_users[entry.entry_id] = 0
+    etzd = etz_data(hass)
+    etzd.loc_users[entry.entry_id] = 0
+    etzd.tz_users[entry.entry_id] = 0
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -63,11 +64,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             or new_state.attributes.get(ATTR_LONGITUDE)
             != old_state.attributes.get(ATTR_LONGITUDE)
         ):
-            if etz_data(hass).loc_users[entry.entry_id]:
-                entity_loc = await get_location(hass, new_state)
+            if etzd.loc_available and etzd.loc_users[entry.entry_id]:
+                entity_loc = await get_loc(hass, new_state)
             else:
                 entity_loc = None
-            if etz_data(hass).tz_users[entry.entry_id]:
+            if etzd.tz_users[entry.entry_id]:
                 entity_tz = get_tz(hass, new_state)
             else:
                 entity_tz = None
@@ -93,8 +94,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     res = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    loc_users = etz_data(hass).loc_users.pop(entry.entry_id)
-    tz_uers = etz_data(hass).tz_users.pop(entry.entry_id)
+    etzd = etz_data(hass)
+    loc_users = etzd.loc_users.pop(entry.entry_id)
+    tz_uers = etzd.tz_users.pop(entry.entry_id)
     assert not loc_users
     assert not tz_uers
     return res

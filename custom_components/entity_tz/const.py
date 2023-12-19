@@ -10,9 +10,6 @@ DIFF_TIME_ON_ICON = "mdi:briefcase-clock"
 LOCAL_TIME_ICON = "mdi:account-clock"
 TIME_ZONE_ICON = "mdi:map-clock"
 
-NOM_TIMEOUT = 10
-NOM_WAIT = 1.5
-
 ATTR_COUNTRY_CODE = "country_code"
 ATTR_UTC_OFFSET = "utc_offset"
 

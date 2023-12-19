@@ -7,6 +7,7 @@
   "documentation": "https://github.com/pnbruckner/ha-entity-tz/blob/master/README.md",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
+  "loggers": ["geopy"],
   "requirements": ["timezonefinder==5.2.0"],
   "version": "1.0.0b9"
 }
