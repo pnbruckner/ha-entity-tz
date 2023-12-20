@@ -9,7 +9,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TIME_ZONE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from .const import (
     DIFF_COUNTRY_OFF_ICON,
@@ -17,7 +16,7 @@ from .const import (
     DIFF_TIME_OFF_ICON,
     DIFF_TIME_ON_ICON,
 )
-from .helpers import ETZEntity, ETZSource
+from .helpers import ETZEntity, ETZSource, not_ha_tz
 
 
 async def async_setup_entry(
@@ -67,10 +66,7 @@ class EntityDiffTZSensor(ETZEntity, BinarySensorEntity):
         if not self._sources_valid:
             return
 
-        n = dt_util.now()
-        self._attr_is_on = n.astimezone(self._entity_tz).replace(
-            tzinfo=None
-        ) != n.replace(tzinfo=None)
+        self._attr_is_on = not_ha_tz(self._entity_tz)
         if self.is_on:
             self._attr_icon = DIFF_TIME_ON_ICON
 

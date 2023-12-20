@@ -1,6 +1,11 @@
 """Entity Time Zone Sensor."""
 from __future__ import annotations
 
+import logging
+
+from async_lru import alru_cache
+from geopy.location import Location
+
 from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
 from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.config_entries import ConfigEntry
@@ -10,6 +15,7 @@ from homeassistant.const import (
     CONF_ENTITY_ID,
     CONF_TIME_ZONE,
     STATE_HOME,
+    STATE_UNAVAILABLE,
     Platform,
 )
 from homeassistant.core import Event, HomeAssistant, State, callback
@@ -19,11 +25,15 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .helpers import etz_data, get_loc, get_tz, init_etz_data, signal
+from .const import DOMAIN, LOC_CACHE_PER_CONFIG
+from .helpers import etz_data, get_tz, init_etz_data, signal
+from .nominatim import get_location
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
+_LOGGER = logging.getLogger(__name__)
+
+_get_location = alru_cache(0)(get_location)
 
 
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
@@ -32,11 +42,30 @@ async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     return True
 
 
+async def get_loc(hass: HomeAssistant, state: State | None) -> Location | str | None:
+    """Get location data from entity state."""
+    if state is None:
+        return STATE_UNAVAILABLE
+    lat = state.attributes.get(ATTR_LATITUDE)
+    lng = state.attributes.get(ATTR_LONGITUDE)
+    if lat is None or lng is None:
+        return STATE_UNAVAILABLE
+
+    location = await _get_location(hass, f"{lat:.4f}, {lng:.4f}")
+    _LOGGER.debug("Location cache: %s", _get_location.cache_info())
+    return location
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up config entry."""
     etzd = etz_data(hass)
     etzd.loc_users[entry.entry_id] = 0
     etzd.tz_users[entry.entry_id] = 0
+
+    loc_cache_size = len(etzd.loc_users) * LOC_CACHE_PER_CONFIG
+    _get_location._LRUCacheWrapper__maxsize = max(  # type: ignore[attr-defined] # pylint: disable=protected-access
+        _get_location._LRUCacheWrapper__maxsize, loc_cache_size  # type: ignore[attr-defined] # pylint: disable=protected-access
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

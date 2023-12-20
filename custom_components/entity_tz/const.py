@@ -1,6 +1,8 @@
 """Constants for Entity Time Zone integration."""
 DOMAIN = "entity_tz"
 
+LOC_CACHE_PER_CONFIG = 8
+
 ADDRESS_ICON = "mdi:map-marker"
 COUNTRY_ICON = "mdi:web"
 DIFF_COUNTRY_OFF_ICON = "mdi:home-city"

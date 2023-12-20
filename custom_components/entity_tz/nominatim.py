@@ -5,7 +5,7 @@ from dataclasses import dataclass, fields
 import logging
 
 from geopy.adapters import AioHTTPAdapter
-from geopy.exc import GeocoderRateLimited
+from geopy.exc import GeocoderRateLimited, GeopyError
 from geopy.geocoders import Nominatim
 from geopy.location import Location
 
@@ -18,7 +18,6 @@ from homeassistant.helpers.aiohttp_client import (
 NOMINATIM_DATA = "sharable_nominatim"
 TIMEOUT = 10
 INITIAL_WAIT = 1.5
-CACHE_SIZE = 25
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +26,6 @@ _LOGGER = logging.getLogger(__name__)
 class NomData:
     """Nomination data."""
 
-    cache: dict[str, Location | None]
     lock: asyncio.Lock
     nominatim: Nominatim
     wait: float
@@ -63,13 +61,28 @@ def init_nominatim(hass: HomeAssistant) -> bool:
     )
     nominatim.adapter.__dict__["session"] = async_get_clientsession(hass)
 
-    _save_nom_data(hass, NomData({}, asyncio.Lock(), nominatim, INITIAL_WAIT))
-    _LOGGER.debug("Initialized Nominatim data with cache size = %i", CACHE_SIZE)
+    _save_nom_data(hass, NomData(asyncio.Lock(), nominatim, INITIAL_WAIT))
     return True
 
 
-async def get_location(hass: HomeAssistant, lat: float, lng: float) -> Location | None:
-    """Get location data from given coordinates."""
+async def get_location(hass: HomeAssistant, coordinates: str) -> Location | None:
+    """Get location data from given coordinates.
+
+    coordinates: string, formatted as "lat, lng"
+
+    To implement required caching:
+
+    pip install async-lru
+
+    from async_lru import alru_cache
+
+    get_loc = alru_cache(CACHE_SIZE)(get_location)
+
+    location = await get_loc(hass, f"{lat:.4f}, {lng:.4f}")
+
+    Rounding lat & lng to four digits limits resolution to about 11 meters,
+    but improves cache hit percentage.
+    """
     nom_data = NomData(**hass.data[NOMINATIM_DATA])
 
     async def limit_rate() -> None:
@@ -77,7 +90,6 @@ async def get_location(hass: HomeAssistant, lat: float, lng: float) -> Location 
         await asyncio.sleep(nom_data.wait)
         nom_data.lock.release()
 
-    coordinates = f"{lat}, {lng}"
     await nom_data.lock.acquire()
     try:
         return await nom_data.nominatim.reverse(coordinates)
@@ -88,8 +100,8 @@ async def get_location(hass: HomeAssistant, lat: float, lng: float) -> Location 
                 nom_data.wait = retry_after
                 _save_nom_data(hass, nom_data)
         _LOGGER.warning("Request has been rate limited. Will retry")
-        return await get_location(hass, lat, lng)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+        return await get_location(hass, coordinates)
+    except GeopyError as exc:
         _LOGGER.error("While retrieving reverse geolocation data: %s", exc)
         return None
     finally:

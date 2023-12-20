@@ -41,7 +41,7 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, SIG_ENTITY_CHANGED
-from .nominatim import get_location, init_nominatim
+from .nominatim import init_nominatim
 
 _ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
 
@@ -58,9 +58,33 @@ class ETZData:
     zones: list[str]
 
 
+def not_ha_tz(tz: tzinfo | str | None) -> bool:
+    """Return if time zone is effectively different than HA's time zone."""
+    if not isinstance(tz, tzinfo):
+        return False
+    n = dt_util.now()
+    return n.astimezone(tz).replace(tzinfo=None) != n.replace(tzinfo=None)
+
+
 def etz_data(hass: HomeAssistant) -> ETZData:
     """Return Entity Time Zone integration data."""
     return cast(ETZData, hass.data[DOMAIN])
+
+
+def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
+    """Get time zone from entity state."""
+    if not state:
+        return STATE_UNAVAILABLE
+    if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
+        return dt_util.DEFAULT_TIME_ZONE
+    lat = state.attributes.get(ATTR_LATITUDE)
+    lng = state.attributes.get(ATTR_LONGITUDE)
+    if lat is None or lng is None:
+        return STATE_UNAVAILABLE
+    tz_name = etz_data(hass).tzf.timezone_at(lat=lat, lng=lng)
+    if tz_name is None:
+        return None
+    return dt_util.get_time_zone(tz_name)
 
 
 async def init_etz_data(hass: HomeAssistant) -> None:
@@ -88,7 +112,7 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         """Update list of zones to use."""
         zones = []
         for state in hass.states.async_all(ZONE_DOMAIN):
-            if get_tz(hass, state) != dt_util.DEFAULT_TIME_ZONE:
+            if not_ha_tz(get_tz(hass, state)):
                 zones.append(state.entity_id)
         etzd.zones = zones
 
@@ -100,34 +124,6 @@ async def init_etz_data(hass: HomeAssistant) -> None:
     update_zones()
     hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update_zones)
     hass.bus.async_listen(EVENT_STATE_CHANGED, update_zones, zones_filter)
-
-
-def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
-    """Get time zone from entity state."""
-    if not state:
-        return STATE_UNAVAILABLE
-    if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
-        return dt_util.DEFAULT_TIME_ZONE
-    lat = state.attributes.get(ATTR_LATITUDE)
-    lng = state.attributes.get(ATTR_LONGITUDE)
-    if lat is None or lng is None:
-        return STATE_UNAVAILABLE
-    tz_name = etz_data(hass).tzf.timezone_at(lat=lat, lng=lng)
-    if tz_name is None:
-        return None
-    return dt_util.get_time_zone(tz_name)
-
-
-async def get_loc(hass: HomeAssistant, state: State | None) -> Location | str | None:
-    """Get location data from entity state."""
-    if state is None:
-        return STATE_UNAVAILABLE
-    lat = state.attributes.get(ATTR_LATITUDE)
-    lng = state.attributes.get(ATTR_LONGITUDE)
-    if lat is None or lng is None:
-        return STATE_UNAVAILABLE
-
-    return await get_location(hass, lat, lng)
 
 
 def signal(entry: ConfigEntry) -> str:
