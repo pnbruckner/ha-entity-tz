@@ -170,16 +170,15 @@ class ETZEntity(Entity):
         sources: Container[ETZSource],
     ) -> None:
         """Initialize sensor entity."""
+        self.entity_description = entity_description
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
         )
         key = entity_description.key
-        enable = _enable_entity(key, entry.data)
-        entity_description.entity_registry_enabled_default = enable
-        entity_description.translation_key = key
-        self.entity_description = entity_description
+        self._attr_entity_registry_enabled_default = _enable_entity(key, entry.data)
+        self._attr_translation_key = key
         self._attr_unique_id = f"{entry.entry_id}-{key}"
         self._sources = sources
         if ETZSource.LOC in sources:
