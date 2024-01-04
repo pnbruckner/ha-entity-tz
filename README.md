@@ -5,11 +5,11 @@ Creates sensors that have details (time zone, address, etc.) about another entit
 Type | Description
 -|-
 address | The address where the entity is located
-country | The country the entity is in. Includes an attribute with the country code.
+country | The country the entity is in. Includes a `country_code` attribute.
 different country | Is `on` when the country where entity is located is different than Home Assistant's country configuration
 different time | Is `on` when the local time where entity is located is different than Home Assistant's local time
-local time | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time.
-time zone | The name of the time zone where the entity is located
+local time | The local time where the entity is located. No time zone suffix is included so that the UI doesn't automatically change it back to Home Assistant's local time. Includes a `time` attribute with a time zone "aware" Python `datetime` object.
+time zone | The name of the time zone where the entity is located. Includes a `utc_offset` attribute.
 
 All entities are disabled by default,
 exept for the "local time" sensor, which is enabled by default for static time zones and zone entities,
@@ -54,4 +54,15 @@ recorder:
     entity_globs:
       - sensor.*_address
       - sensor.*_local_time
+```
+
+## Template Example
+
+It is possible to use the `time` attribute of the "local time" sensor to convert other
+Python `datetime` or `time` objects to the same time zone.
+For example:
+```yaml
+{% set test = states('input_datetime.test')|as_datetime|as_local %}
+{{ test }}
+{{ test.astimezone(state_attr('sensor.abc_local_time', 'time').tzinfo) }}
 ```
