@@ -34,7 +34,10 @@
                 }
             },
             "local_time": {
-                "name": "local time"
+                "name": "local time",
+                "state_attributes": {
+                    "time": {"name": "Time"}
+                }
             },
             "time_zone": {
                 "name": "time zone",

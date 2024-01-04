@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_TIME_ZONE
+from homeassistant.const import ATTR_TIME, CONF_TIME_ZONE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.util.dt as dt_util
@@ -80,13 +80,16 @@ class EntityLocalTimeSensor(ETZEntity, SensorEntity):
 
     async def async_update(self) -> None:
         """Update sensor."""
+        self._attr_extra_state_attributes = {ATTR_TIME: None}
         if not self._sources_valid:
             return
 
-        value = dt_util.now(self._entity_tz).time().isoformat("minutes")
+        dt_now = dt_util.now(self._entity_tz)
+        value = dt_now.time().isoformat("minutes")
         if value[0] == "0":
             value = value[1:]
         self._attr_native_value = value
+        self._attr_extra_state_attributes[ATTR_TIME] = dt_now
 
 
 class EntityTimeZoneSensor(ETZEntity, SensorEntity):
