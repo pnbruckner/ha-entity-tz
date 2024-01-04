@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
   "loggers": ["geopy"],
   "requirements": ["async-lru==2.0.4", "timezonefinder==5.2.0"],
-  "version": "1.0.0b"
+  "version": "1.0.1"
 }
