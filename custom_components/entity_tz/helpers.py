@@ -6,6 +6,8 @@ from collections.abc import Container, Mapping
 from dataclasses import dataclass
 from datetime import tzinfo
 from enum import Enum, auto
+from functools import lru_cache
+import logging
 from typing import Any, cast
 from zoneinfo import available_timezones
 
@@ -45,6 +47,7 @@ from .const import DOMAIN, SIG_ENTITY_CHANGED
 from .nominatim import init_nominatim
 
 _ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(init=False)
@@ -72,6 +75,14 @@ def etz_data(hass: HomeAssistant) -> ETZData:
     return cast(ETZData, hass.data[DOMAIN])
 
 
+@lru_cache
+def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | None:
+    """Get time zone from a location."""
+    if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
+        return None
+    return dt_util.get_time_zone(tz_name)
+
+
 def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
     """Get time zone from entity state."""
     if not state:
@@ -82,10 +93,9 @@ def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
         return STATE_UNAVAILABLE
-    tz_name = etz_data(hass).tzf.timezone_at(lat=lat, lng=lng)
-    if tz_name is None:
-        return None
-    return dt_util.get_time_zone(tz_name)
+    tz = _get_tz_from_loc(etz_data(hass).tzf, round(lat, 4), round(lng, 4))
+    _LOGGER.debug("Time zone cache: %s", _get_tz_from_loc.cache_info())
+    return tz
 
 
 async def init_etz_data(hass: HomeAssistant) -> None:
@@ -108,8 +118,14 @@ async def init_etz_data(hass: HomeAssistant) -> None:
 
     await hass.async_add_executor_job(init_tz_data)
 
-    async def update_zones(_: Event | None = None) -> None:
+    async def update_zones(event: Event | None = None) -> None:
         """Update list of zones to use."""
+        # Ignore events that do not contain any data.
+        # For some reason, there are two EVENT_CORE_CONFIG_UPDATE events issued at
+        # startup, even though the core config has not changed.
+        if event and not event.data:
+            return
+
         zones = []
         for state in hass.states.async_all(ZONE_DOMAIN):
             if not_ha_tz(get_tz(hass, state)):
