@@ -1,6 +1,7 @@
 """Entity Time Zone Sensor Helpers."""
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Container, Mapping
 from dataclasses import dataclass
 from datetime import tzinfo
@@ -107,13 +108,15 @@ async def init_etz_data(hass: HomeAssistant) -> None:
 
     await hass.async_add_executor_job(init_tz_data)
 
-    @callback
-    def update_zones(_: Event | None = None) -> None:
+    async def update_zones(_: Event | None = None) -> None:
         """Update list of zones to use."""
         zones = []
         for state in hass.states.async_all(ZONE_DOMAIN):
             if not_ha_tz(get_tz(hass, state)):
                 zones.append(state.entity_id)
+            # get_tz, since it might call timezone_at, can take a while, so give other
+            # tasks a chance to run.
+            await asyncio.sleep(0)
         etzd.zones = zones
 
     @callback
@@ -121,7 +124,7 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         """Return if the state changed event is for a zone."""
         return split_entity_id(event.data["entity_id"])[0] == ZONE_DOMAIN
 
-    update_zones()
+    await update_zones()
     hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update_zones)
     hass.bus.async_listen(EVENT_STATE_CHANGED, update_zones, zones_filter)
 
