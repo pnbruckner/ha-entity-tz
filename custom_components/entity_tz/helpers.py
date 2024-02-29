@@ -1,7 +1,6 @@
 """Entity Time Zone Sensor Helpers."""
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Container, Mapping
 from dataclasses import dataclass
 from datetime import tzinfo
@@ -77,13 +76,16 @@ def etz_data(hass: HomeAssistant) -> ETZData:
 
 @lru_cache
 def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | None:
-    """Get time zone from a location."""
+    """Get time zone from a location.
+
+    This must be run in an executor since timezone_at may do file I/O.
+    """
     if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
         return None
     return dt_util.get_time_zone(tz_name)
 
 
-def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
+async def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
     """Get time zone from entity state."""
     if not state:
         return STATE_UNAVAILABLE
@@ -93,7 +95,9 @@ def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | None:
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
         return STATE_UNAVAILABLE
-    tz = _get_tz_from_loc(etz_data(hass).tzf, round(lat, 4), round(lng, 4))
+    tz = await hass.async_add_executor_job(
+        _get_tz_from_loc, etz_data(hass).tzf, round(lat, 4), round(lng, 4)
+    )
     _LOGGER.debug("Time zone cache: %s", _get_tz_from_loc.cache_info())
     return tz
 
@@ -128,11 +132,8 @@ async def init_etz_data(hass: HomeAssistant) -> None:
 
         zones = []
         for state in hass.states.async_all(ZONE_DOMAIN):
-            if not_ha_tz(get_tz(hass, state)):
+            if not_ha_tz(await get_tz(hass, state)):
                 zones.append(state.entity_id)
-            # get_tz, since it might call timezone_at, can take a while, so give other
-            # tasks a chance to run.
-            await asyncio.sleep(0)
         etzd.zones = zones
 
     @callback

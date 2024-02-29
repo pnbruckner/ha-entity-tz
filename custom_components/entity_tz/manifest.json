@@ -5,6 +5,7 @@
   "config_flow": true,
   "dependencies": ["zone"],
   "documentation": "https://github.com/pnbruckner/ha-entity-tz/blob/1.1.0/README.md",
+  "import_executor": true,
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
   "loggers": ["geopy"],
