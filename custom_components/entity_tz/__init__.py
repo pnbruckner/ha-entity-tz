@@ -63,8 +63,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     etzd.tz_users[entry.entry_id] = 0
 
     loc_cache_size = len(etzd.loc_users) * LOC_CACHE_PER_CONFIG
-    _get_location._LRUCacheWrapper__maxsize = max(  # type: ignore[attr-defined] # pylint: disable=protected-access
-        _get_location._LRUCacheWrapper__maxsize, loc_cache_size  # type: ignore[attr-defined] # pylint: disable=protected-access
+    _get_location._LRUCacheWrapper__maxsize = max(  # pylint: disable=protected-access
+        _get_location._LRUCacheWrapper__maxsize,  # pylint: disable=protected-access
+        loc_cache_size,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -98,7 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             else:
                 entity_loc = None
             if etzd.tz_users[entry.entry_id]:
-                entity_tz = get_tz(hass, new_state)
+                entity_tz = await get_tz(hass, new_state)
             else:
                 entity_tz = None
             async_dispatcher_send(hass, signal(entry), entity_loc, entity_tz)
