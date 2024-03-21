@@ -63,8 +63,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     etzd.tz_users[entry.entry_id] = 0
 
     loc_cache_size = len(etzd.loc_users) * LOC_CACHE_PER_CONFIG
-    _get_location._LRUCacheWrapper__maxsize = max(  # pylint: disable=protected-access
-        _get_location._LRUCacheWrapper__maxsize,  # pylint: disable=protected-access
+    _get_location._LRUCacheWrapper__maxsize = max(  # type: ignore[attr-defined] # pylint: disable=protected-access
+        _get_location._LRUCacheWrapper__maxsize,  # type: ignore[attr-defined] # pylint: disable=protected-access
         loc_cache_size,
     )
 

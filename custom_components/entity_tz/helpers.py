@@ -130,16 +130,21 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         if event and not event.data:
             return
 
-        zones = []
-        for state in hass.states.async_all(ZONE_DOMAIN):
-            if not_ha_tz(await get_tz(hass, state)):
-                zones.append(state.entity_id)
-        etzd.zones = zones
+        etzd.zones = [
+            state.entity_id
+            for state in hass.states.async_all(ZONE_DOMAIN)
+            if not_ha_tz(await get_tz(hass, state))
+        ]
 
     @callback
-    def zones_filter(event: Event) -> bool:
+    def zones_filter(event_or_data: Event | Mapping[str, Any]) -> bool:
         """Return if the state changed event is for a zone."""
-        return split_entity_id(event.data["entity_id"])[0] == ZONE_DOMAIN
+        # Event filter signature changed after 2024.3.
+        try:
+            entity_id = event_or_data["entity_id"]  # type: ignore[index]
+        except TypeError:
+            entity_id = event_or_data.data["entity_id"]  # type: ignore[union-attr]
+        return split_entity_id(entity_id)[0] == ZONE_DOMAIN
 
     await update_zones()
     hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, update_zones)
