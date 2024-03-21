@@ -7,6 +7,7 @@ from datetime import tzinfo
 from enum import Enum, auto
 from functools import lru_cache
 import logging
+import struct
 from typing import Any, cast
 from zoneinfo import available_timezones
 
@@ -80,7 +81,18 @@ def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | No
 
     This must be run in an executor since timezone_at may do file I/O.
     """
-    if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
+    try:
+        if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
+            return None
+    except struct.error as err:
+        _LOGGER.debug(
+            "Getting time zone at (%f, %f) resulted in error: %s.%s: %s",
+            lat,
+            lng,
+            err.__class__.__module__,
+            err.__class__.__name__,
+            err,
+        )
         return None
     return dt_util.get_time_zone(tz_name)
 
