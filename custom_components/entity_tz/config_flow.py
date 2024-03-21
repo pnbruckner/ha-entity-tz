@@ -12,6 +12,15 @@ from homeassistant.components.geo_location import DOMAIN as GL_DOMAIN
 from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.components.zone import DOMAIN as ZONE_DOMAIN
 from homeassistant.config_entries import ConfigFlow
+
+# ConfigFlowResult added after 2024.3.
+try:
+    from homeassistant.config_entries import ConfigFlowResult
+except ImportError:
+    from homeassistant.data_entry_flow import FlowResult
+
+    ConfigFlowResult = FlowResult  # type: ignore[assignment, misc]
+
 from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
@@ -19,7 +28,6 @@ from homeassistant.const import (
     CONF_TIME_ZONE,
 )
 from homeassistant.core import HomeAssistant, State, split_entity_id
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -75,7 +83,7 @@ class EntityTimeZoneConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Start user config flow."""
         errors = {}
 
