@@ -7,7 +7,7 @@ from datetime import tzinfo
 from enum import Enum, auto
 from functools import lru_cache
 import logging
-import struct
+import traceback
 from typing import Any, cast
 from zoneinfo import available_timezones
 
@@ -75,6 +75,11 @@ def etz_data(hass: HomeAssistant) -> ETZData:
     return cast(ETZData, hass.data[DOMAIN])
 
 
+def format_exc(exc: Exception) -> str:
+    """Format an exception."""
+    return "; ".join(s.strip() for s in traceback.format_exception_only(exc))
+
+
 @lru_cache
 def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | None:
     """Get time zone from a location.
@@ -84,14 +89,12 @@ def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | No
     try:
         if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
             return None
-    except struct.error as err:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         _LOGGER.debug(
-            "Getting time zone at (%f, %f) resulted in error: %s.%s: %s",
+            "Getting time zone at (%f, %f) resulted in error: %s",
             lat,
             lng,
-            err.__class__.__module__,
-            err.__class__.__name__,
-            err,
+            format_exc(exc),
         )
         return None
     return dt_util.get_time_zone(tz_name)
