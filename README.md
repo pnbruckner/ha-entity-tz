@@ -4,7 +4,7 @@ Creates sensors that have details (time zone, address, etc.) about another entit
 
 Type | Description
 -|-
-address | The address where the entity is located
+address | The address where the entity is located. See also [Address Sensor](#address-sensor).
 country | The country the entity is in. Includes a `country_code` attribute.
 different country | Is `on` when the country where entity is located is different than Home Assistant's country configuration
 different time | Is `on` when the local time where entity is located is different than Home Assistant's local time
@@ -14,6 +14,14 @@ time zone | The name of the time zone where the entity is located. Includes a `u
 All entities are disabled by default,
 exept for the "local time" sensor, which is enabled by default for static time zones and zone entities,
 and the "time zone" sensor, which is enabled by default for all other entities.
+
+### Address Sensor
+The address sensor's state will typically be a "combined" address string, containing house number, road, etc.
+It will also have attributes for each of the address "details".
+The list of possible attributes is documented [here](https://nominatim.org/release-docs/develop/api/Output/#addressdetails).
+The exact set of attributes can change over time.
+Do not count on any particular attribute always being present.
+E.g., in templates, always check for the attribute's presence, or provide a `|default()` filter.
 
 ## Installation
 ### With HACS

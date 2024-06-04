@@ -41,10 +41,13 @@ class EntityAddressSensor(ETZEntity, SensorEntity):
 
     async def async_update(self) -> None:
         """Update sensor."""
+        self._attr_extra_state_attributes = {}
         if not self._sources_valid:
             return
 
         self._attr_native_value = self._entity_loc.address
+        for attr, value in self._entity_loc.raw["address"].items():
+            self._attr_extra_state_attributes[attr] = value
 
 
 class EntityCountrySensor(ETZEntity, SensorEntity):
