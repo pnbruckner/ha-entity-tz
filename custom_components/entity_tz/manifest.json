@@ -4,11 +4,11 @@
   "codeowners": ["@pnbruckner"],
   "config_flow": true,
   "dependencies": ["zone"],
-  "documentation": "https://github.com/pnbruckner/ha-entity-tz/blob/1.2.0/README.md",
+  "documentation": "https://github.com/pnbruckner/ha-entity-tz/blob/1.2.1/README.md",
   "import_executor": true,
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
   "loggers": ["geopy"],
   "requirements": ["async-lru==2.0.4", "timezonefinder==5.2.0"],
-  "version": "1.2.0"
+  "version": "1.2.1"
 }
