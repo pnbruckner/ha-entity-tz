@@ -71,7 +71,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     if (tz_name := entry.data.get(CONF_TIME_ZONE)) is not None:
-        async_dispatcher_send(hass, signal(entry), None, dt_util.get_time_zone(tz_name))
+        # get_time_zone must be run in an executor since it may do file I/O.
+        tz = await hass.async_add_executor_job(dt_util.get_time_zone, tz_name)
+        async_dispatcher_send(hass, signal(entry), None, tz)
         return True
 
     entity_id = entry.data[CONF_ENTITY_ID]

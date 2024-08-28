@@ -84,7 +84,7 @@ def format_exc(exc: Exception) -> str:
 def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | None:
     """Get time zone from a location.
 
-    This must be run in an executor since timezone_at may do file I/O.
+    This must be run in an executor since timezone_at or get_time_zone may do file I/O.
     """
     try:
         if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
@@ -105,6 +105,9 @@ async def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | Non
     if not state:
         return STATE_UNAVAILABLE
     if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
+        # get_default_time_zone is new in HA 2024.6.
+        if hasattr(dt_util, "get_default_time_zone"):
+            return dt_util.get_default_time_zone()
         return dt_util.DEFAULT_TIME_ZONE
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
