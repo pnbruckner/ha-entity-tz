@@ -11,16 +11,7 @@ from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
 from homeassistant.components.geo_location import DOMAIN as GL_DOMAIN
 from homeassistant.components.person import DOMAIN as PERSON_DOMAIN
 from homeassistant.components.zone import DOMAIN as ZONE_DOMAIN
-from homeassistant.config_entries import ConfigFlow
-
-# ConfigFlowResult added after 2024.3.
-try:
-    from homeassistant.config_entries import ConfigFlowResult
-except ImportError:
-    from homeassistant.data_entry_flow import FlowResult
-
-    ConfigFlowResult = FlowResult  # type: ignore[assignment, misc]
-
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
@@ -51,8 +42,7 @@ def _wrapped_entity_config_entry_title(
     state = hass.states.get(entity_id)
     if state_name := (state and state.name):
         return state_name
-    object_id = split_entity_id(entity_id)[1]
-    return object_id
+    return split_entity_id(entity_id)[1]
 
 
 def _list_entity(
