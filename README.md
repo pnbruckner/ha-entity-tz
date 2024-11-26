@@ -47,7 +47,7 @@ where `<config>` is your Home Assistant configuration directory.
 
 ### Versions
 
-This custom integration supports HomeAssistant versions 2023.4.0 or newer.
+This custom integration supports HomeAssistant versions 2024.8.3 or newer.
 
 ## Sensor History
 
