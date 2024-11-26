@@ -42,12 +42,15 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
+from homeassistant.util.hass_dict import HassKey
 
 from .const import DOMAIN, SIG_ENTITY_CHANGED
 from .nominatim import init_nominatim
 
 _ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
 _LOGGER = logging.getLogger(__name__)
+
+ETZ_DATA: HassKey[ETZData] = HassKey(DOMAIN)
 
 
 @dataclass(init=False)
@@ -72,7 +75,7 @@ def not_ha_tz(tz: tzinfo | str | None) -> bool:
 
 def etz_data(hass: HomeAssistant) -> ETZData:
     """Return Entity Time Zone integration data."""
-    return cast(ETZData, hass.data[DOMAIN])
+    return hass.data[ETZ_DATA]
 
 
 def format_exc(exc: Exception) -> str:
@@ -119,9 +122,9 @@ async def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | Non
 
 async def init_etz_data(hass: HomeAssistant) -> None:
     """Initialize integration's data."""
-    if DOMAIN in hass.data:
+    if ETZ_DATA in hass.data:
         return
-    hass.data[DOMAIN] = etzd = ETZData()
+    hass.data[ETZ_DATA] = etzd = ETZData()
     etzd.loc_available = init_nominatim(hass)
     etzd.loc_users = {}
     etzd.tz_users = {}
