@@ -29,25 +29,28 @@ from homeassistant.const import (
     STATE_HOME,
     STATE_UNAVAILABLE,
 )
-from homeassistant.core import Event, HomeAssistant, State, callback, split_entity_id
-from homeassistant.helpers.device_registry import DeviceEntryType
-
-# Device Info moved to device_registry in 2023.9
-try:
-    from homeassistant.helpers.device_registry import DeviceInfo
-except ImportError:
-    from homeassistant.helpers.entity import DeviceInfo  # type: ignore[attr-defined]
-
+from homeassistant.core import (
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+    split_entity_id,
+)
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity, EntityDescription
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
+from homeassistant.util.hass_dict import HassKey
 
 from .const import DOMAIN, SIG_ENTITY_CHANGED
 from .nominatim import init_nominatim
 
 _ALWAYS_DISABLED_ENTITIES = ("address", "country", "diff_country", "diff_time")
 _LOGGER = logging.getLogger(__name__)
+
+ETZ_DATA: HassKey[ETZData] = HassKey(DOMAIN)
 
 
 @dataclass(init=False)
@@ -72,7 +75,7 @@ def not_ha_tz(tz: tzinfo | str | None) -> bool:
 
 def etz_data(hass: HomeAssistant) -> ETZData:
     """Return Entity Time Zone integration data."""
-    return cast(ETZData, hass.data[DOMAIN])
+    return hass.data[ETZ_DATA]
 
 
 def format_exc(exc: Exception) -> str:
@@ -89,7 +92,7 @@ def _get_tz_from_loc(tzf: TimezoneFinder, lat: float, lng: float) -> tzinfo | No
     try:
         if (tz_name := tzf.timezone_at(lat=lat, lng=lng)) is None:
             return None
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:  # noqa: BLE001 # pylint: disable=broad-exception-caught
         _LOGGER.debug(
             "Getting time zone at (%f, %f) resulted in error: %s",
             lat,
@@ -105,10 +108,7 @@ async def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | Non
     if not state:
         return STATE_UNAVAILABLE
     if state.domain in (PERSON_DOMAIN, DT_DOMAIN) and state.state == STATE_HOME:
-        # get_default_time_zone is new in HA 2024.6.
-        if hasattr(dt_util, "get_default_time_zone"):
-            return dt_util.get_default_time_zone()
-        return dt_util.DEFAULT_TIME_ZONE
+        return dt_util.get_default_time_zone()
     lat = state.attributes.get(ATTR_LATITUDE)
     lng = state.attributes.get(ATTR_LONGITUDE)
     if lat is None or lng is None:
@@ -122,9 +122,9 @@ async def get_tz(hass: HomeAssistant, state: State | None) -> tzinfo | str | Non
 
 async def init_etz_data(hass: HomeAssistant) -> None:
     """Initialize integration's data."""
-    if DOMAIN in hass.data:
+    if ETZ_DATA in hass.data:
         return
-    hass.data[DOMAIN] = etzd = ETZData()
+    hass.data[ETZ_DATA] = etzd = ETZData()
     etzd.loc_available = init_nominatim(hass)
     etzd.loc_users = {}
     etzd.tz_users = {}
@@ -140,7 +140,9 @@ async def init_etz_data(hass: HomeAssistant) -> None:
 
     await hass.async_add_executor_job(init_tz_data)
 
-    async def update_zones(event: Event | None = None) -> None:
+    async def update_zones(
+        event: Event | Event[EventStateChangedData] | None = None,
+    ) -> None:
         """Update list of zones to use."""
         # Ignore events that do not contain any data.
         # For some reason, there are two EVENT_CORE_CONFIG_UPDATE events issued at
@@ -155,13 +157,9 @@ async def init_etz_data(hass: HomeAssistant) -> None:
         ]
 
     @callback
-    def zones_filter(event_or_data: Event | Mapping[str, Any]) -> bool:
+    def zones_filter(event_data: Mapping[str, Any]) -> bool:
         """Return if the state changed event is for a zone."""
-        # Event filter signature changed after 2024.3.
-        try:
-            entity_id = event_or_data["entity_id"]  # type: ignore[index]
-        except TypeError:
-            entity_id = event_or_data.data["entity_id"]  # type: ignore[union-attr]
+        entity_id = event_data["entity_id"]
         return split_entity_id(entity_id)[0] == ZONE_DOMAIN
 
     await update_zones()

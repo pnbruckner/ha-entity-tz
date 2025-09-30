@@ -18,7 +18,13 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     Platform,
 )
-from homeassistant.core import Event, HomeAssistant, State, callback
+from homeassistant.core import (
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
@@ -63,22 +69,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     etzd.tz_users[entry.entry_id] = 0
 
     loc_cache_size = len(etzd.loc_users) * LOC_CACHE_PER_CONFIG
-    _get_location._LRUCacheWrapper__maxsize = max(  # pylint: disable=protected-access
-        _get_location._LRUCacheWrapper__maxsize,  # pylint: disable=protected-access
+    _get_location._LRUCacheWrapper__maxsize = max(  # type: ignore[attr-defined] # noqa: SLF001 # pylint: disable=protected-access
+        _get_location._LRUCacheWrapper__maxsize,  # type: ignore[attr-defined] # noqa: SLF001 # pylint: disable=protected-access
         loc_cache_size,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     if (tz_name := entry.data.get(CONF_TIME_ZONE)) is not None:
-        # get_time_zone must be run in an executor since it may do file I/O.
-        tz = await hass.async_add_executor_job(dt_util.get_time_zone, tz_name)
+        tz = await dt_util.async_get_time_zone(tz_name)
         async_dispatcher_send(hass, signal(entry), None, tz)
         return True
 
     entity_id = entry.data[CONF_ENTITY_ID]
 
-    async def update_from_entity(event: Event | None = None) -> None:
+    async def update_from_entity(
+        event: Event[EventStateChangedData] | None = None,
+    ) -> None:
         """Process input entity state update."""
         if event:
             new_state: State | None = event.data["new_state"]
@@ -107,7 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             async_dispatcher_send(hass, signal(entry), entity_loc, entity_tz)
 
     @callback
-    def sensor_state_listener(event: Event) -> None:
+    def sensor_state_listener(event: Event[EventStateChangedData]) -> None:
         """Handle input entity state changed event."""
         entry.async_create_background_task(
             hass, update_from_entity(event), "Entity update"

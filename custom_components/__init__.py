@@ -1,0 +1,1 @@
+"""Entity Time Zone Sensor."""

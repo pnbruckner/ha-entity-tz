@@ -44,8 +44,8 @@ def init_nominatim(hass: HomeAssistant) -> bool:
         nom_data = hass.data[NOMINATIM_DATA]
         try:
             for field in fields(NomData):
-                if not isinstance(nom_data[field.name], field.type):
-                    raise TypeError
+                if not isinstance(nom_data[field.name], field.type):  # type: ignore[arg-type]
+                    raise TypeError  # noqa: TRY301
         except (KeyError, TypeError):
             msg = f"Unexpected data in hass.data[{NOMINATIM_DATA!r}]: {nom_data}"
             _LOGGER.error(msg)
