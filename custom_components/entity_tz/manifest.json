@@ -8,6 +8,6 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/pnbruckner/ha-entity-tz/issues",
   "loggers": ["geopy"],
-  "requirements": ["async-lru==2.0.4", "timezonefinder==8.1.0"],
+  "requirements": ["async-lru==2.0.5", "timezonefinder==8.1.0"],
   "version": "1.3.0"
 }
