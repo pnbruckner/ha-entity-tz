@@ -1,4 +1,4 @@
-# <img src="https://brands.home-assistant.io/entity_tz/icon.png" alt="Entity Time Zone Sensor" width="50" height="50"/> Entity Time Zone Sensor
+# <img src="custom_components/entity_tz/brand/icon.png" alt="Entity Time Zone Sensor" width="50" height="50"/> Entity Time Zone Sensor
 
 Creates sensors that have details (time zone, address, etc.) about another entity's location, or the local time of a fixed time zone.
 
